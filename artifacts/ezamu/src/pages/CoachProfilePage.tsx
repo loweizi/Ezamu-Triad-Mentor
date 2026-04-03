@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useGetCoach, useGetCoachAvailability, useCreateAppointment, getGetCoachQueryKey, getGetCoachAvailabilityQueryKey, getGetAppointmentsQueryKey } from "@workspace/api-client-react";
 import { useParams, useLocation } from "wouter";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { Calendar as CalendarIcon, Clock, ChevronLeft, Loader2, Info } from "lucide-react";
 import { Link } from "wouter";
@@ -45,7 +45,7 @@ export function CoachProfilePage() {
       data: {
         coachId: id,
         title: `Mentorship Session with ${coach?.firstName}`,
-        scheduledAt: `${slot.date}T${slot.startTime}`
+        scheduledAt: new Date(`${slot.date}T${slot.startTime.substring(0, 5)}`).toISOString()
       }
     }, {
       onSuccess: () => {
@@ -145,7 +145,7 @@ export function CoachProfilePage() {
                       {/* Date Selection */}
                       <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
                         {availableDates.map(date => {
-                          const dateObj = new Date(date);
+                          const dateObj = parseISO(date);
                           const isSelected = selectedDate === date;
                           return (
                             <button
@@ -174,7 +174,7 @@ export function CoachProfilePage() {
                         <div>
                           <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center">
                             <Clock className="w-4 h-4 mr-1.5" />
-                            Available times for {format(new Date(selectedDate), "MMMM d, yyyy")}
+                            Available times for {format(parseISO(selectedDate), "MMMM d, yyyy")}
                           </h3>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             {availabilityByDate[selectedDate].map(slot => (
