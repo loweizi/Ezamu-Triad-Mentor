@@ -1,18 +1,26 @@
+import { useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe } from "@workspace/api-client-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Activity, Calendar, CheckCircle2, MessageCircle, AlertCircle, ArrowRight, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function DashboardPage() {
+  const [, setLocation] = useLocation();
   const { data: user, isLoading: isUserLoading } = useGetMe();
   const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary();
   const { data: actionItems, isLoading: isItemsLoading } = useGetActionItems();
   const { data: appointments, isLoading: isAppointmentsLoading } = useGetAppointments();
+
+  useEffect(() => {
+    if (!isUserLoading && user && !user.onboardingCompleted) {
+      setLocation("/onboarding");
+    }
+  }, [user, isUserLoading, setLocation]);
 
   const isLoading = isUserLoading || isSummaryLoading || isItemsLoading || isAppointmentsLoading;
 

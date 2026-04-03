@@ -47,7 +47,12 @@ export function SignUpPage() {
           className="flex-1 flex items-center justify-center p-4"
           style={{ background: "linear-gradient(180deg, #121c34 0%, #3131d8 55%, #add8e6 100%)" }}
         >
-          <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+          <SignUp
+            routing="path"
+            path={`${basePath}/sign-up`}
+            signInUrl={`${basePath}/sign-in`}
+            forceRedirectUrl={`${basePath}/onboarding`}
+          />
         </div>
       </MainLayout>
     );
