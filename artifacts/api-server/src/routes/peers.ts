@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ne, and, or } from "drizzle-orm";
-import { db, usersTable, peerRequestsTable } from "@workspace/db";
+import { db, usersTable, peerRequestsTable, actionItemsTable, smartGoalsTable, notificationsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
@@ -128,6 +128,72 @@ router.patch("/peer-requests/:id", requireAuth, async (req, res): Promise<void> 
   }
 
   res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
+});
+
+router.get("/peer/summary", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const [me] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
+  if (!me) { res.status(404).json({ error: "User not found" }); return; }
+  if (!me.peerId) { res.status(200).json(null); return; }
+
+  const [peer] = await db.select({
+    id: usersTable.id,
+    firstName: usersTable.firstName,
+    lastName: usersTable.lastName,
+    profilePicUrl: usersTable.profilePicUrl,
+    innerHeroArchetype: usersTable.innerHeroArchetype,
+    fieldsOfInterest: usersTable.fieldsOfInterest,
+    bio: usersTable.bio,
+  }).from(usersTable).where(eq(usersTable.id, me.peerId));
+
+  if (!peer) { res.status(200).json(null); return; }
+
+  const actionItems = await db.select().from(actionItemsTable).where(eq(actionItemsTable.studentId, me.peerId));
+  const smartGoals = await db.select({
+    id: smartGoalsTable.id,
+    title: smartGoalsTable.title,
+    status: smartGoalsTable.status,
+    timeBound: smartGoalsTable.timeBound,
+  }).from(smartGoalsTable).where(eq(smartGoalsTable.studentId, me.peerId));
+
+  res.json({
+    peer,
+    actionItems: actionItems.map(i => ({
+      id: i.id,
+      title: i.title,
+      description: i.description,
+      completed: i.completed,
+      createdAt: i.createdAt.toISOString(),
+    })),
+    smartGoals: smartGoals.map(g => ({
+      id: g.id,
+      title: g.title,
+      status: g.status,
+      timeBound: g.timeBound instanceof Date ? g.timeBound.toISOString() : g.timeBound,
+    })),
+  });
+});
+
+router.post("/peer/nudge", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const [me] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
+  if (!me) { res.status(404).json({ error: "User not found" }); return; }
+  if (!me.peerId) { res.status(400).json({ error: "You don't have a peer yet" }); return; }
+
+  const { taskTitle } = req.body;
+  const senderName = `${me.firstName} ${me.lastName}`;
+  const message = taskTitle
+    ? `${senderName} sent you a nudge: don't forget to complete "${taskTitle}"! You've got this! 💪`
+    : `${senderName} sent you a nudge to keep going and finish your tasks! You've got this! 💪`;
+
+  const [notif] = await db.insert(notificationsTable).values({
+    userId: me.peerId,
+    type: "nudge",
+    message,
+    read: false,
+  }).returning();
+
+  res.status(201).json({ ...notif, createdAt: notif.createdAt.toISOString() });
 });
 
 export default router;

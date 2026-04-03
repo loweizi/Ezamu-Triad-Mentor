@@ -14,10 +14,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, useUpdateActionItem, getGetActionItemsQueryKey, getGetDashboardSummaryQueryKey, type SmartGoal, type ActionItem } from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, useUpdateActionItem, useGetPeerSummary, useSendNudge, getGetActionItemsQueryKey, getGetDashboardSummaryQueryKey, type SmartGoal, type ActionItem, type PeerActionItem } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2, Plus, Target, Clock, CheckCheck, XCircle, ChevronDown, ChevronUp, Check } from "lucide-react";
+import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2, Plus, Target, Clock, CheckCheck, XCircle, ChevronDown, ChevronUp, Check, Bell, Users } from "lucide-react";
 import { format, formatDistanceToNow, isPast, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -304,6 +304,10 @@ export function StudentDashboardPage() {
   const { data: appointments, isLoading: isAppointmentsLoading } = useGetAppointments();
   const { data: smartGoals = [], isLoading: isGoalsLoading } = useGetSmartGoals();
   const updateActionItem = useUpdateActionItem();
+  const { data: peerSummary } = useGetPeerSummary();
+  const sendNudge = useSendNudge();
+  const [nudgedIds, setNudgedIds] = useState<Set<number>>(new Set());
+  const [nudgedAll, setNudgedAll] = useState(false);
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
   const [goalsFilter, setGoalsFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
   const [selectedItem, setSelectedItem] = useState<ActionItem | null>(null);
@@ -321,6 +325,21 @@ export function StudentDashboardPage() {
       toast({ title: "Error", description: "Failed to mark item as complete.", variant: "destructive" });
     } finally {
       setCompletingId(null);
+    }
+  };
+
+  const handleNudge = async (taskTitle?: string, taskId?: number) => {
+    try {
+      await sendNudge.mutateAsync(taskTitle);
+      if (taskId !== undefined) {
+        setNudgedIds(prev => new Set(prev).add(taskId));
+      } else {
+        setNudgedAll(true);
+        setTimeout(() => setNudgedAll(false), 5000);
+      }
+      toast({ title: "Nudge sent!", description: `${peerSummary?.peer.firstName} has been notified.` });
+    } catch {
+      toast({ title: "Failed to send nudge", variant: "destructive" });
     }
   };
 
@@ -705,6 +724,114 @@ export function StudentDashboardPage() {
                 </CardContent>
               </Card>
 
+              {/* Accountability Partner */}
+              {peerSummary && (
+                <Card className="shadow-sm border-none">
+                  <CardHeader className="border-b bg-slate-50/50 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg font-serif text-[#121c34] flex items-center gap-2">
+                          <Users className="w-4 h-4 text-[#3131d8]" />
+                          Accountability Partner
+                        </CardTitle>
+                        <CardDescription className="mt-0.5">
+                          Keep {peerSummary.peer.firstName} on track
+                        </CardDescription>
+                      </div>
+                      <button
+                        onClick={() => handleNudge()}
+                        disabled={sendNudge.isPending || nudgedAll}
+                        className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
+                          nudgedAll
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : "bg-[#dbb68f]/20 text-[#bb7e5d] border-[#dbb68f]/40 hover:bg-[#dbb68f]/30"
+                        }`}
+                        title={`Send a general nudge to ${peerSummary.peer.firstName}`}
+                      >
+                        <Bell className="w-3.5 h-3.5" />
+                        {nudgedAll ? "Nudged!" : "Nudge All"}
+                      </button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4 pb-3 space-y-4">
+                    {/* Peer identity */}
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
+                        <AvatarImage src={peerSummary.peer.profilePicUrl ?? undefined} />
+                        <AvatarFallback className="bg-[#121c34] text-white text-sm font-semibold">
+                          {peerSummary.peer.firstName[0]}{peerSummary.peer.lastName[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold text-[#121c34] text-sm">
+                          {peerSummary.peer.firstName} {peerSummary.peer.lastName}
+                        </p>
+                        {peerSummary.peer.innerHeroArchetype && (
+                          <p className="text-xs text-muted-foreground capitalize">{peerSummary.peer.innerHeroArchetype}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action items */}
+                    {peerSummary.actionItems.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2">
+                          Action Plan
+                          <span className="ml-1.5 text-muted-foreground font-normal normal-case">
+                            ({peerSummary.actionItems.filter(i => i.completed).length}/{peerSummary.actionItems.length} done)
+                          </span>
+                        </p>
+                        <div className="space-y-1.5">
+                          {peerSummary.actionItems.slice(0, 5).map(item => (
+                            <PeerTaskRow
+                              key={item.id}
+                              item={item}
+                              nudged={nudgedIds.has(item.id)}
+                              isSending={sendNudge.isPending}
+                              onNudge={() => handleNudge(item.title, item.id)}
+                            />
+                          ))}
+                          {peerSummary.actionItems.length > 5 && (
+                            <p className="text-xs text-muted-foreground pl-1">
+                              +{peerSummary.actionItems.length - 5} more tasks
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Smart goals summary */}
+                    {peerSummary.smartGoals.length > 0 && (
+                      <div className="pt-3 border-t">
+                        <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2">SMART Goals</p>
+                        <div className="flex gap-2 flex-wrap">
+                          {(["approved", "pending", "denied"] as const).map(status => {
+                            const count = peerSummary.smartGoals.filter(g => g.status === status).length;
+                            if (!count) return null;
+                            const cfg = {
+                              approved: "bg-green-50 text-green-700 border-green-200",
+                              pending: "bg-amber-50 text-amber-700 border-amber-200",
+                              denied: "bg-red-50 text-red-700 border-red-200",
+                            }[status];
+                            return (
+                              <span key={status} className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cfg}`}>
+                                {count} {status}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {peerSummary.actionItems.length === 0 && peerSummary.smartGoals.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-3">
+                        {peerSummary.peer.firstName} hasn't started their plan yet.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Assessment Teaser */}
               {!user?.innerHeroArchetype && (
                 <Card className="shadow-sm border-none bg-gradient-to-br from-[#121c34] to-[#3131d8] text-white">
@@ -862,6 +989,41 @@ export function StudentDashboardPage() {
         </DialogContent>
       </Dialog>
     </MainLayout>
+  );
+}
+
+function PeerTaskRow({ item, nudged, isSending, onNudge }: {
+  item: PeerActionItem;
+  nudged: boolean;
+  isSending: boolean;
+  onNudge: () => void;
+}) {
+  return (
+    <div className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors ${item.completed ? "opacity-50" : "hover:bg-slate-50"}`}>
+      <div className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${
+        item.completed ? "bg-green-500 border-green-500" : "border-slate-300"
+      }`}>
+        {item.completed && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+      </div>
+      <p className={`flex-1 text-xs min-w-0 truncate ${item.completed ? "line-through text-muted-foreground" : "text-[#121c34]"}`}>
+        {item.title}
+      </p>
+      {!item.completed && (
+        <button
+          onClick={onNudge}
+          disabled={isSending || nudged}
+          title="Send a nudge for this task"
+          className={`flex-shrink-0 flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-all ${
+            nudged
+              ? "bg-green-50 text-green-700 border-green-200"
+              : "bg-[#3131d8]/5 text-[#3131d8] border-[#3131d8]/20 hover:bg-[#3131d8]/10"
+          }`}
+        >
+          <Bell className="w-2.5 h-2.5" />
+          {nudged ? "Sent" : "Nudge"}
+        </button>
+      )}
+    </div>
   );
 }
 

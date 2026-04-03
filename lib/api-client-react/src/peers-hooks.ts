@@ -59,6 +59,54 @@ export function useSendPeerRequest() {
   });
 }
 
+export interface PeerActionItem {
+  id: number;
+  title: string;
+  description: string | null;
+  completed: boolean;
+  createdAt: string;
+}
+
+export interface PeerGoal {
+  id: number;
+  title: string;
+  status: "pending" | "approved" | "denied";
+  timeBound: string;
+}
+
+export interface PeerSummary {
+  peer: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    profilePicUrl: string | null;
+    innerHeroArchetype: string | null;
+    fieldsOfInterest: string[];
+    bio: string | null;
+  };
+  actionItems: PeerActionItem[];
+  smartGoals: PeerGoal[];
+}
+
+export const PEER_SUMMARY_QUERY_KEY = ["peer-summary"];
+
+export function useGetPeerSummary() {
+  return useQuery<PeerSummary | null>({
+    queryKey: PEER_SUMMARY_QUERY_KEY,
+    queryFn: () => customFetch<PeerSummary | null>("/api/peer/summary"),
+  });
+}
+
+export function useSendNudge() {
+  return useMutation({
+    mutationFn: (taskTitle?: string) =>
+      customFetch<{ id: number }>("/api/peer/nudge", {
+        method: "POST",
+        body: JSON.stringify({ taskTitle }),
+      }),
+  });
+}
+
 export function useRespondPeerRequest() {
   const queryClient = useQueryClient();
   return useMutation({
