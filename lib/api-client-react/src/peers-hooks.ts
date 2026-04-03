@@ -23,8 +23,8 @@ export interface PeerRequest {
   direction: "sent" | "received";
   createdAt: string;
   updatedAt: string;
-  fromUser: { id: number; firstName: string; lastName: string; profilePicUrl: string | null; innerHeroArchetype: string | null; fieldsOfInterest: string[]; bio: string | null } | null;
-  toUser: { id: number; firstName: string; lastName: string; profilePicUrl: string | null; innerHeroArchetype: string | null; fieldsOfInterest: string[]; bio: string | null } | null;
+  fromUser: { id: number; firstName: string; lastName: string; email?: string; profilePicUrl: string | null; innerHeroArchetype: string | null; fieldsOfInterest: string[]; bio: string | null } | null;
+  toUser: { id: number; firstName: string; lastName: string; email?: string; profilePicUrl: string | null; innerHeroArchetype: string | null; fieldsOfInterest: string[]; bio: string | null } | null;
 }
 
 export const STUDENTS_QUERY_KEY = ["students"];

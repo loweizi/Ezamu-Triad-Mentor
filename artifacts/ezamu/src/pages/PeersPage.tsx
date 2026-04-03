@@ -33,6 +33,7 @@ import {
   Star,
   BookOpen,
   UserCheck,
+  Mail,
 } from "lucide-react";
 
 const ARCHETYPE_COLORS: Record<string, string> = {
@@ -203,22 +204,32 @@ export function PeersPage() {
                         {accepted.map(r => {
                           const other = r.direction === "sent" ? r.toUser : r.fromUser;
                           return (
-                            <div key={r.id} className="bg-white rounded-2xl shadow-sm border border-green-100 p-4 flex items-center gap-4">
-                              <Avatar className="h-12 w-12 ring-2 ring-green-200">
+                            <div key={r.id} className="bg-white rounded-2xl shadow-sm border border-green-100 p-4 flex items-start gap-4">
+                              <Avatar className="h-12 w-12 ring-2 ring-green-200 flex-shrink-0">
                                 <AvatarImage src={other?.profilePicUrl ?? undefined} />
                                 <AvatarFallback className="bg-green-100 text-green-700 font-semibold">
                                   {other?.firstName?.[0]}{other?.lastName?.[0]}
                                 </AvatarFallback>
                               </Avatar>
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-[#121c34]">{other?.firstName} {other?.lastName}</p>
                                 {other?.innerHeroArchetype && (
                                   <Badge className={`text-[10px] mt-0.5 border ${archetypeColor(other.innerHeroArchetype)}`}>
                                     {other.innerHeroArchetype}
                                   </Badge>
                                 )}
+                                {other?.email && (
+                                  <a
+                                    href={`mailto:${other.email}`}
+                                    className="flex items-center gap-1.5 mt-2 text-xs text-[#3131d8] hover:underline w-fit"
+                                    onClick={e => e.stopPropagation()}
+                                  >
+                                    <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+                                    <span className="truncate">{other.email}</span>
+                                  </a>
+                                )}
                               </div>
-                              <Badge className="bg-green-50 text-green-700 border border-green-200 text-xs">Partners</Badge>
+                              <Badge className="bg-green-50 text-green-700 border border-green-200 text-xs flex-shrink-0">Partners</Badge>
                             </div>
                           );
                         })}
@@ -357,23 +368,45 @@ export function PeersPage() {
               </div>
             </DialogHeader>
 
-            <div className="space-y-4 py-2">
-              {profileStudent.bio && (
-                <p className="text-sm text-muted-foreground text-center leading-relaxed">{profileStudent.bio}</p>
-              )}
-              {profileStudent.fieldsOfInterest.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <BookOpen className="w-3.5 h-3.5" /> Fields of Interest
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {profileStudent.fieldsOfInterest.map(f => (
-                      <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>
-                    ))}
-                  </div>
+            {(() => {
+              const partnerEmail = profileStudent.requestStatus === "accepted"
+                ? (accepted.find(r =>
+                    r.fromUserId === profileStudent.id || r.toUserId === profileStudent.id
+                  )?.fromUserId === profileStudent.id
+                    ? accepted.find(r => r.fromUserId === profileStudent.id || r.toUserId === profileStudent.id)?.fromUser?.email
+                    : accepted.find(r => r.fromUserId === profileStudent.id || r.toUserId === profileStudent.id)?.toUser?.email)
+                : undefined;
+              return (
+                <div className="space-y-4 py-2">
+                  {profileStudent.bio && (
+                    <p className="text-sm text-muted-foreground text-center leading-relaxed">{profileStudent.bio}</p>
+                  )}
+                  {partnerEmail && (
+                    <div className="flex items-center justify-center">
+                      <a
+                        href={`mailto:${partnerEmail}`}
+                        className="flex items-center gap-2 text-sm text-[#3131d8] hover:underline bg-[#3131d8]/5 border border-[#3131d8]/20 rounded-full px-4 py-1.5"
+                      >
+                        <Mail className="w-4 h-4 flex-shrink-0" />
+                        {partnerEmail}
+                      </a>
+                    </div>
+                  )}
+                  {profileStudent.fieldsOfInterest.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2 flex items-center gap-1">
+                        <BookOpen className="w-3.5 h-3.5" /> Fields of Interest
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {profileStudent.fieldsOfInterest.map(f => (
+                          <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setProfileStudent(null)}>Close</Button>

@@ -60,19 +60,24 @@ router.get("/peer-requests", requireAuth, async (req, res): Promise<void> => {
 
   const userIds = [...new Set(requests.flatMap(r => [r.fromUserId, r.toUserId]))];
   const users = userIds.length
-    ? await db.select({ id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName, profilePicUrl: usersTable.profilePicUrl, innerHeroArchetype: usersTable.innerHeroArchetype, fieldsOfInterest: usersTable.fieldsOfInterest, bio: usersTable.bio }).from(usersTable).where(or(...userIds.map(id => eq(usersTable.id, id))))
+    ? await db.select({ id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName, email: usersTable.email, profilePicUrl: usersTable.profilePicUrl, innerHeroArchetype: usersTable.innerHeroArchetype, fieldsOfInterest: usersTable.fieldsOfInterest, bio: usersTable.bio }).from(usersTable).where(or(...userIds.map(id => eq(usersTable.id, id))))
     : [];
 
   const usersById = Object.fromEntries(users.map(u => [u.id, u]));
 
-  res.json(requests.map(r => ({
-    ...r,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-    fromUser: usersById[r.fromUserId] ?? null,
-    toUser: usersById[r.toUserId] ?? null,
-    direction: r.fromUserId === me.id ? "sent" : "received",
-  })));
+  res.json(requests.map(r => {
+    const isAccepted = r.status === "accepted";
+    const fromUser = usersById[r.fromUserId] ?? null;
+    const toUser = usersById[r.toUserId] ?? null;
+    return {
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+      fromUser: fromUser ? { ...fromUser, email: isAccepted ? fromUser.email : undefined } : null,
+      toUser: toUser ? { ...toUser, email: isAccepted ? toUser.email : undefined } : null,
+      direction: r.fromUserId === me.id ? "sent" : "received",
+    };
+  }));
 });
 
 router.post("/peer-requests", requireAuth, async (req, res): Promise<void> => {
