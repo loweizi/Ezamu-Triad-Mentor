@@ -3,13 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Ezamu Triad Mentorship Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: users
+    description: User profile operations
+  - name: coaches
+    description: Coach operations
+  - name: appointments
+    description: Appointment scheduling
+  - name: action-items
+    description: Action items management
+  - name: assessment
+    description: Inner Hero assessment
+  - name: availability
+    description: Coach availability
+  - name: notifications
+    description: User notifications
+  - name: messages
+    description: Chat messages
+  - name: dashboard
+    description: Dashboard summary data
+
 paths:
   /healthz:
     get:
@@ -24,6 +43,525 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+    patch:
+      operationId: updateMe
+      tags: [users]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+
+  /users/onboard:
+    post:
+      operationId: onboardUser
+      tags: [users]
+      summary: Complete initial user onboarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardUserBody"
+      responses:
+        "200":
+          description: Updated user after onboarding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+
+  /coaches:
+    get:
+      operationId: getCoaches
+      tags: [coaches]
+      summary: Get list of available coaches
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: field
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of coaches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Coach"
+
+  /coaches/{coachId}:
+    get:
+      operationId: getCoach
+      tags: [coaches]
+      summary: Get a specific coach profile
+      parameters:
+        - name: coachId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Coach profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coach"
+        "404":
+          description: Coach not found
+
+  /coaches/{coachId}/students:
+    get:
+      operationId: getCoachStudents
+      tags: [coaches]
+      summary: Get students assigned to a coach
+      parameters:
+        - name: coachId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /appointments:
+    get:
+      operationId: getAppointments
+      tags: [appointments]
+      summary: Get appointments for current user
+      responses:
+        "200":
+          description: List of appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
+    post:
+      operationId: createAppointment
+      tags: [appointments]
+      summary: Create a new appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppointmentBody"
+      responses:
+        "201":
+          description: Created appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+
+  /appointments/{appointmentId}:
+    get:
+      operationId: getAppointment
+      tags: [appointments]
+      summary: Get a specific appointment
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateAppointment
+      tags: [appointments]
+      summary: Update an appointment (e.g. accept/reject)
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppointmentBody"
+      responses:
+        "200":
+          description: Updated appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+    delete:
+      operationId: deleteAppointment
+      tags: [appointments]
+      summary: Cancel an appointment
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /action-items:
+    get:
+      operationId: getActionItems
+      tags: [action-items]
+      summary: Get action items for current student
+      responses:
+        "200":
+          description: List of action items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActionItem"
+    post:
+      operationId: createActionItem
+      tags: [action-items]
+      summary: Create an action item (coach only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateActionItemBody"
+      responses:
+        "201":
+          description: Created action item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionItem"
+
+  /action-items/{itemId}:
+    patch:
+      operationId: updateActionItem
+      tags: [action-items]
+      summary: Update an action item (mark complete, etc.)
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateActionItemBody"
+      responses:
+        "200":
+          description: Updated action item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionItem"
+    delete:
+      operationId: deleteActionItem
+      tags: [action-items]
+      summary: Delete an action item
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /assessment/results:
+    get:
+      operationId: getAssessmentResults
+      tags: [assessment]
+      summary: Get assessment results for current user
+      responses:
+        "200":
+          description: Assessment results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AssessmentResult"
+    post:
+      operationId: saveAssessmentResult
+      tags: [assessment]
+      summary: Save assessment result
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveAssessmentBody"
+      responses:
+        "201":
+          description: Saved result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentResult"
+
+  /assessment/results/latest:
+    get:
+      operationId: getLatestAssessmentResult
+      tags: [assessment]
+      summary: Get the most recent assessment result for current user
+      responses:
+        "200":
+          description: Latest result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentResult"
+        "404":
+          description: No assessment taken yet
+
+  /availability:
+    get:
+      operationId: getCoachAvailability
+      tags: [availability]
+      summary: Get availability for a coach
+      parameters:
+        - name: coachId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of availability slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AvailabilitySlot"
+    post:
+      operationId: addAvailability
+      tags: [availability]
+      summary: Add a coach availability slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddAvailabilityBody"
+      responses:
+        "201":
+          description: Created slot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailabilitySlot"
+
+  /availability/{slotId}:
+    delete:
+      operationId: deleteAvailability
+      tags: [availability]
+      summary: Remove a coach availability slot
+      parameters:
+        - name: slotId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [notifications]
+      summary: Get notifications for current user
+      responses:
+        "200":
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{notificationId}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required: [success]
+
+  /messages:
+    get:
+      operationId: getMessages
+      tags: [messages]
+      summary: Get messages between current user and another
+      parameters:
+        - name: withUserId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "201":
+          description: Sent message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /messages/conversations:
+    get:
+      operationId: getConversations
+      tags: [messages]
+      summary: Get all conversations (last message per contact) for current user
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary for current user
+      responses:
+        "200":
+          description: Dashboard summary data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /users/search:
+    get:
+      operationId: searchUsers
+      tags: [users]
+      summary: Search users by email (for chat/guardian invite)
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +572,457 @@ components:
       required:
         - status
 
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkId:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [student, coach, guardian]
+        profilePicUrl:
+          type: ["string", "null"]
+        innerHeroArchetype:
+          type: ["string", "null"]
+        coachId:
+          type: ["integer", "null"]
+        peerId:
+          type: ["integer", "null"]
+        bio:
+          type: ["string", "null"]
+        age:
+          type: ["integer", "null"]
+        fieldsOfInterest:
+          type: array
+          items:
+            type: string
+        fieldsOfExpertise:
+          type: array
+          items:
+            type: string
+        onboardingCompleted:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - clerkId
+        - firstName
+        - lastName
+        - email
+        - role
+        - fieldsOfInterest
+        - fieldsOfExpertise
+        - onboardingCompleted
+        - createdAt
+
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        profilePicUrl:
+          type: ["string", "null"]
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+        - role
+
+    UpdateUserBody:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        profilePicUrl:
+          type: ["string", "null"]
+        bio:
+          type: ["string", "null"]
+        age:
+          type: ["integer", "null"]
+        fieldsOfInterest:
+          type: array
+          items:
+            type: string
+        fieldsOfExpertise:
+          type: array
+          items:
+            type: string
+
+    OnboardUserBody:
+      type: object
+      properties:
+        age:
+          type: integer
+        bio:
+          type: string
+        fieldsOfInterest:
+          type: array
+          items:
+            type: string
+        fieldsOfExpertise:
+          type: array
+          items:
+            type: string
+      required:
+        - bio
+
+    Coach:
+      type: object
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        profilePicUrl:
+          type: ["string", "null"]
+        bio:
+          type: ["string", "null"]
+        age:
+          type: ["integer", "null"]
+        fieldsOfExpertise:
+          type: array
+          items:
+            type: string
+        studentCount:
+          type: integer
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+        - fieldsOfExpertise
+        - studentCount
+
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: integer
+        studentId:
+          type: integer
+        coachId:
+          type: integer
+        peerId:
+          type: ["integer", "null"]
+        title:
+          type: string
+        scheduledAt:
+          type: string
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled]
+        studentName:
+          type: string
+        coachName:
+          type: string
+      required:
+        - id
+        - studentId
+        - coachId
+        - title
+        - scheduledAt
+        - status
+        - studentName
+        - coachName
+
+    CreateAppointmentBody:
+      type: object
+      properties:
+        coachId:
+          type: integer
+        title:
+          type: string
+        scheduledAt:
+          type: string
+        peerId:
+          type: ["integer", "null"]
+      required:
+        - coachId
+        - title
+        - scheduledAt
+
+    UpdateAppointmentBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled]
+        title:
+          type: string
+        scheduledAt:
+          type: string
+
+    ActionItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        studentId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        completed:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - studentId
+        - title
+        - completed
+        - createdAt
+
+    CreateActionItemBody:
+      type: object
+      properties:
+        studentId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+      required:
+        - studentId
+        - title
+
+    UpdateActionItemBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        completed:
+          type: boolean
+
+    AssessmentResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        studentId:
+          type: integer
+        innerHeroType:
+          type: string
+          enum: [helper, doer, thinker, planner]
+        helperScore:
+          type: integer
+        doerScore:
+          type: integer
+        thinkerScore:
+          type: integer
+        plannerScore:
+          type: integer
+        summary:
+          type: string
+        dateTaken:
+          type: string
+      required:
+        - id
+        - studentId
+        - innerHeroType
+        - helperScore
+        - doerScore
+        - thinkerScore
+        - plannerScore
+        - summary
+        - dateTaken
+
+    SaveAssessmentBody:
+      type: object
+      properties:
+        innerHeroType:
+          type: string
+          enum: [helper, doer, thinker, planner]
+        helperScore:
+          type: integer
+        doerScore:
+          type: integer
+        thinkerScore:
+          type: integer
+        plannerScore:
+          type: integer
+        summary:
+          type: string
+      required:
+        - innerHeroType
+        - helperScore
+        - doerScore
+        - thinkerScore
+        - plannerScore
+        - summary
+
+    AvailabilitySlot:
+      type: object
+      properties:
+        id:
+          type: integer
+        coachId:
+          type: integer
+        date:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+      required:
+        - id
+        - coachId
+        - date
+        - startTime
+        - endTime
+
+    AddAvailabilityBody:
+      type: object
+      properties:
+        date:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+      required:
+        - date
+        - startTime
+        - endTime
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        type:
+          type: string
+        message:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+        relatedId:
+          type: ["integer", "null"]
+      required:
+        - id
+        - userId
+        - type
+        - message
+        - read
+        - createdAt
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        senderId:
+          type: integer
+        receiverId:
+          type: integer
+        content:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+        senderName:
+          type: string
+        senderProfilePic:
+          type: ["string", "null"]
+      required:
+        - id
+        - senderId
+        - receiverId
+        - content
+        - read
+        - createdAt
+        - senderName
+
+    SendMessageBody:
+      type: object
+      properties:
+        receiverId:
+          type: integer
+        content:
+          type: string
+      required:
+        - receiverId
+        - content
+
+    Conversation:
+      type: object
+      properties:
+        userId:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        profilePicUrl:
+          type: ["string", "null"]
+        lastMessage:
+          type: string
+        lastMessageAt:
+          type: string
+        unreadCount:
+          type: integer
+      required:
+        - userId
+        - firstName
+        - lastName
+        - lastMessage
+        - lastMessageAt
+        - unreadCount
+
+    DashboardSummary:
+      type: object
+      properties:
+        upcomingAppointmentsCount:
+          type: integer
+        pendingActionItemsCount:
+          type: integer
+        completedActionItemsCount:
+          type: integer
+        unreadMessagesCount:
+          type: integer
+        unreadNotificationsCount:
+          type: integer
+        latestAssessmentType:
+          type: ["string", "null"]
+        assignedStudentsCount:
+          type: ["integer", "null"]
+      required:
+        - upcomingAppointmentsCount
+        - pendingActionItemsCount
+        - completedActionItemsCount
+        - unreadMessagesCount
+        - unreadNotificationsCount
