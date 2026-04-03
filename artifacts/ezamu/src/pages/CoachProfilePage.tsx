@@ -12,6 +12,14 @@ import { Calendar as CalendarIcon, Clock, ChevronLeft, Loader2, Info } from "luc
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 
+function formatSlotTime(t: string) {
+  const [hStr, mStr] = t.split(":");
+  const h = parseInt(hStr, 10);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${mStr} ${ampm}`;
+}
+
 export function CoachProfilePage() {
   const { coachId } = useParams();
   const [, setLocation] = useLocation();
@@ -185,7 +193,7 @@ export function CoachProfilePage() {
                                 onClick={() => handleBook(slot)}
                                 disabled={createAppointment.isPending}
                               >
-                                {slot.startTime.substring(0, 5)}
+                                {formatSlotTime(slot.startTime)}
                               </Button>
                             ))}
                           </div>
