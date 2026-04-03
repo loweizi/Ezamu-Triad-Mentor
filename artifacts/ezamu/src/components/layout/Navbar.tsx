@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Show, useClerk, useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MessageCircle, Menu, User as UserIcon, LogOut, Activity, CalendarDays } from "lucide-react";
+import { MessageCircle, Menu, User as UserIcon, LogOut, Activity, CalendarDays, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,6 +98,12 @@ export function Navbar() {
             <Link href="/appointments" className={getNavLinkClass("/appointments")}>
               Appointments
             </Link>
+            {appUser?.role === "student" && (
+              <Link href="/peers" className={getNavLinkClass("/peers", "flex items-center gap-1.5")}>
+                <Users className="w-4 h-4" />
+                Peers
+              </Link>
+            )}
 
             <div className={`flex items-center gap-4 ml-4 pl-4 ${dividerClass}`}>
               <Link href="/chat" className={`relative ${isHome ? "text-[#121c34]/70 hover:text-[#121c34] transition-colors" : "text-white/80 hover:text-white transition-colors"}`}>
@@ -199,6 +205,12 @@ export function Navbar() {
                   <Link href="/appointments" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/appointments")}>
                     Appointments
                   </Link>
+                  {appUser?.role === "student" && (
+                    <Link href="/peers" onClick={() => setMobileMenuOpen(false)} className={`${getMobileNavLinkClass("/peers")} flex items-center gap-2`}>
+                      <Users className="w-5 h-5" />
+                      Peers
+                    </Link>
+                  )}
                   <Link href="/chat" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/chat")}>
                     Messages
                   </Link>

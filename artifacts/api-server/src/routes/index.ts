@@ -13,6 +13,7 @@ import webhooksRouter from "./webhooks";
 import coachRouter from "./coach";
 import smartGoalsRouter from "./smart-goals";
 import coachNotesRouter from "./coach-notes";
+import peersRouter from "./peers";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(dashboardRouter);
 router.use(coachRouter);
 router.use(smartGoalsRouter);
 router.use(coachNotesRouter);
+router.use(peersRouter);
 
 export default router;

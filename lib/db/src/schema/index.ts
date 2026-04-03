@@ -7,3 +7,4 @@ export * from "./notifications";
 export * from "./messages";
 export * from "./smart-goals";
 export * from "./coach-notes";
+export * from "./peer-requests";
