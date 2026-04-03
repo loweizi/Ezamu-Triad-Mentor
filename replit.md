@@ -35,6 +35,8 @@ Ezamu is a full-stack triad mentorship web platform connecting students with coa
 - **assessment_results** — Inner Hero quiz results per student
 - **notifications** — in-app notifications per user
 - **messages** — chat messages between users
+- **smart_goals** — SMART goals created by students, approved/denied by coaches
+- **coach_notes** — private coach notes per student (only visible to the coach)
 
 ## Pages
 
@@ -42,10 +44,11 @@ Ezamu is a full-stack triad mentorship web platform connecting students with coa
 - `/sign-in` — Clerk sign-in
 - `/sign-up` — Clerk sign-up
 - `/onboarding` — Post-signup onboarding flow
-- `/dashboard` — Student/Coach dashboard
+- `/dashboard` — Role-aware dashboard (coach sees CoachDashboardPage, student sees StudentDashboardPage)
 - `/assessment` — 9-question Inner Hero assessment
 - `/appointments` — Browse coaches and book sessions
 - `/coach/:coachId` — Individual coach profile
+- `/coach/student/:studentId` — Coach view of a student (info, progress, SMART goals, private notes)
 - `/profile` — Edit profile
 - `/chat` — Messaging
 - `/contact` — Contact page (public)

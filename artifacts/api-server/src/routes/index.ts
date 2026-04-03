@@ -10,6 +10,9 @@ import notificationsRouter from "./notifications";
 import messagesRouter from "./messages";
 import dashboardRouter from "./dashboard";
 import webhooksRouter from "./webhooks";
+import coachRouter from "./coach";
+import smartGoalsRouter from "./smart-goals";
+import coachNotesRouter from "./coach-notes";
 
 const router: IRouter = Router();
 
@@ -24,5 +27,8 @@ router.use(availabilityRouter);
 router.use(notificationsRouter);
 router.use(messagesRouter);
 router.use(dashboardRouter);
+router.use(coachRouter);
+router.use(smartGoalsRouter);
+router.use(coachNotesRouter);
 
 export default router;
