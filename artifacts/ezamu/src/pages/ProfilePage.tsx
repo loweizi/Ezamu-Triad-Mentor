@@ -9,8 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useGetMe, useUpdateMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Camera, Save } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Camera, Save, Check } from "lucide-react";
 
 const ALL_FIELDS = [
   "Science & Math", "Coding & Tech", "Arts & Design", 
@@ -175,27 +174,30 @@ export function ProfilePage() {
                         {user?.role === 'coach' ? 'Fields of Expertise' : 'Fields of Interest'}
                       </Label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {ALL_FIELDS.map(field => (
-                          <div 
-                            key={field}
-                            className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                              fields.includes(field) 
-                                ? "border-[#3131d8] bg-[#3131d8]/5" 
-                                : "border-slate-200 hover:border-[#3131d8]/30"
-                            }`}
-                            onClick={() => handleFieldToggle(field)}
-                          >
-                            <Checkbox 
-                              id={`field-${field}`} 
-                              checked={fields.includes(field)}
-                              onCheckedChange={() => {}}
-                              className="data-[state=checked]:bg-[#3131d8] data-[state=checked]:border-[#3131d8] pointer-events-none"
-                            />
-                            <span className="flex-1 font-medium text-sm">
-                              {field}
-                            </span>
-                          </div>
-                        ))}
+                        {ALL_FIELDS.map(field => {
+                          const checked = fields.includes(field);
+                          return (
+                            <button
+                              key={field}
+                              type="button"
+                              onClick={() => handleFieldToggle(field)}
+                              className={`flex items-center gap-3 p-3 rounded-lg border text-left w-full transition-colors ${
+                                checked
+                                  ? "border-[#3131d8] bg-[#3131d8]/5"
+                                  : "border-slate-200 hover:border-[#3131d8]/30"
+                              }`}
+                            >
+                              <div className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
+                                checked
+                                  ? "bg-[#3131d8] border-[#3131d8]"
+                                  : "bg-white border-slate-300"
+                              }`}>
+                                {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                              </div>
+                              <span className="flex-1 font-medium text-sm text-[#121c34]">{field}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 

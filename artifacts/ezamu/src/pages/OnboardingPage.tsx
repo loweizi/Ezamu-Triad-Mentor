@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useGetMe, useOnboardUser, getGetMeQueryKey } from "@workspace/api-client-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { Check } from "lucide-react";
 
 const INTERESTS = [
-  "Science & Math", "Coding & Tech", "Arts & Design", 
+  "Science & Math", "Coding & Tech", "Arts & Design",
   "Writing & Literature", "Business & Finance", "Healthcare",
   "Psychology", "Engineering", "Music & Performance"
 ];
@@ -22,12 +22,15 @@ export function OnboardingPage() {
   const queryClient = useQueryClient();
   const { data: user, isLoading: isUserLoading } = useGetMe();
   const onboardMutation = useOnboardUser();
-  
+
   const [step, setStep] = useState(1);
   const [age, setAge] = useState<string>("");
   const [bio, setBio] = useState("");
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+
   const pendingRole = localStorage.getItem("ezamu_pending_role") as "student" | "coach" | "guardian" | null;
+  const pendingFirstName = localStorage.getItem("ezamu_pending_firstName") || "";
+  const pendingLastName = localStorage.getItem("ezamu_pending_lastName") || "";
 
   useEffect(() => {
     if (user?.onboardingCompleted) {
@@ -36,7 +39,7 @@ export function OnboardingPage() {
   }, [user, setLocation]);
 
   const handleInterestToggle = (interest: string) => {
-    setSelectedInterests(prev => 
+    setSelectedInterests(prev =>
       prev.includes(interest)
         ? prev.filter(i => i !== interest)
         : [...prev, interest]
@@ -64,23 +67,24 @@ export function OnboardingPage() {
       toast.error("Please write a short bio.");
       return;
     }
-    
+
     onboardMutation.mutate(
-      { 
-        data: { 
+      {
+        data: {
+          ...(pendingFirstName ? { firstName: pendingFirstName } : {}),
+          ...(pendingLastName ? { lastName: pendingLastName } : {}),
           age: Number(age),
           bio,
           ...(pendingRole ? { role: pendingRole } : {}),
           fieldsOfInterest: selectedInterests
-        } 
+        }
       },
       {
         onSuccess: (updatedUser) => {
-          // Write the updated user (onboardingCompleted: true) into the cache
-          // immediately so DashboardPage sees it on first render and doesn't
-          // bounce back to /onboarding.
           queryClient.setQueryData(getGetMeQueryKey(), updatedUser);
           localStorage.removeItem("ezamu_pending_role");
+          localStorage.removeItem("ezamu_pending_firstName");
+          localStorage.removeItem("ezamu_pending_lastName");
           toast.success("Welcome to Ezamu!");
           setLocation("/dashboard");
         },
@@ -106,20 +110,25 @@ export function OnboardingPage() {
       <div className="flex-1 flex items-center justify-center p-4 bg-slate-50">
         <Card className="w-full max-w-lg border-none shadow-xl">
           <div className="h-2 w-full bg-slate-100 rounded-t-xl overflow-hidden">
-            <div 
+            <div
               className="h-full bg-[#3131d8] transition-all duration-500 ease-in-out"
               style={{ width: `${(step / 3) * 100}%` }}
             />
           </div>
-          
+
           <CardHeader className="text-center pb-2">
+            {pendingFirstName && (
+              <p className="text-sm text-muted-foreground mb-1">
+                Welcome, <span className="font-medium text-[#121c34]">{pendingFirstName}</span>!
+              </p>
+            )}
             <CardTitle className="text-2xl font-serif text-[#121c34]">
               {step === 1 && "Let's get started"}
               {step === 2 && "What excites you?"}
               {step === 3 && "Tell us about yourself"}
             </CardTitle>
             <CardDescription className="text-base">
-              {step === 1 && "Just a few quick questions to personalize your experience."}
+              {step === 1 && "Just a few quick questions to personalise your experience."}
               {step === 2 && "Select the fields you're most interested in exploring."}
               {step === 3 && "Write a short bio so coaches can get to know you."}
             </CardDescription>
@@ -130,10 +139,10 @@ export function OnboardingPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="age">How old are you?</Label>
-                  <Input 
-                    id="age" 
-                    type="number" 
-                    placeholder="e.g. 16" 
+                  <Input
+                    id="age"
+                    type="number"
+                    placeholder="e.g. 16"
                     value={age}
                     onChange={(e) => setAge(e.target.value)}
                     className="h-12 text-lg"
@@ -144,26 +153,30 @@ export function OnboardingPage() {
 
             {step === 2 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {INTERESTS.map(interest => (
-                  <div 
-                    key={interest}
-                    className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                      selectedInterests.includes(interest) 
-                        ? "border-[#3131d8] bg-[#3131d8]/5" 
-                        : "border-slate-200 hover:border-[#3131d8]/30"
-                    }`}
-                    onClick={() => handleInterestToggle(interest)}
-                  >
-                    <Checkbox 
-                      checked={selectedInterests.includes(interest)}
-                      onCheckedChange={() => {}}
-                      className="data-[state=checked]:bg-[#3131d8] data-[state=checked]:border-[#3131d8] pointer-events-none"
-                    />
-                    <span className="flex-1 font-medium text-sm">
-                      {interest}
-                    </span>
-                  </div>
-                ))}
+                {INTERESTS.map(interest => {
+                  const selected = selectedInterests.includes(interest);
+                  return (
+                    <button
+                      key={interest}
+                      type="button"
+                      onClick={() => handleInterestToggle(interest)}
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-colors w-full ${
+                        selected
+                          ? "border-[#3131d8] bg-[#3131d8]/5"
+                          : "border-slate-200 hover:border-[#3131d8]/30"
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
+                        selected
+                          ? "bg-[#3131d8] border-[#3131d8]"
+                          : "bg-white border-slate-300"
+                      }`}>
+                        {selected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                      </div>
+                      <span className="flex-1 font-medium text-sm text-[#121c34]">{interest}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -171,8 +184,8 @@ export function OnboardingPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="bio">Your Bio</Label>
-                  <Textarea 
-                    id="bio" 
+                  <Textarea
+                    id="bio"
                     placeholder="I'm a high school junior interested in..."
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
@@ -184,25 +197,25 @@ export function OnboardingPage() {
           </CardContent>
 
           <CardFooter className="flex justify-between border-t p-6">
-            <Button 
-              variant="ghost" 
-              onClick={handleBack} 
+            <Button
+              variant="ghost"
+              onClick={handleBack}
               disabled={step === 1 || onboardMutation.isPending}
               className="text-muted-foreground"
             >
               Back
             </Button>
-            
+
             {step < 3 ? (
-              <Button 
+              <Button
                 onClick={handleNext}
                 className="bg-[#121c34] hover:bg-[#121c34]/90 px-8"
               >
                 Continue
               </Button>
             ) : (
-              <Button 
-                onClick={handleSubmit} 
+              <Button
+                onClick={handleSubmit}
                 disabled={onboardMutation.isPending}
                 className="bg-[#dbb68f] text-[#121c34] hover:bg-[#dbb68f]/90 px-8"
               >

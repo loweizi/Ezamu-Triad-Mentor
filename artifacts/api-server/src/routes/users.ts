@@ -104,6 +104,8 @@ router.post("/users/onboard", requireAuth, async (req, res): Promise<void> => {
     bio: parsed.data.bio,
     onboardingCompleted: true,
   };
+  if (parsed.data.firstName) updates.firstName = parsed.data.firstName;
+  if (parsed.data.lastName) updates.lastName = parsed.data.lastName;
   if (parsed.data.age != null) updates.age = parsed.data.age;
   if (parsed.data.role) updates.role = parsed.data.role;
   if (parsed.data.fieldsOfInterest) updates.fieldsOfInterest = parsed.data.fieldsOfInterest;

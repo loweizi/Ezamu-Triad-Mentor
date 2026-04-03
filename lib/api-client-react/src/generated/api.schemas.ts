@@ -67,8 +67,11 @@ export interface UpdateUserBody {
 }
 
 export interface OnboardUserBody {
+  firstName?: string;
+  lastName?: string;
   age?: number;
   bio: string;
+  role?: "student" | "coach" | "guardian";
   fieldsOfInterest?: string[];
   fieldsOfExpertise?: string[];
 }

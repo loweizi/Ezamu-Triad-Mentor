@@ -74,6 +74,8 @@ export const UpdateMeResponse = zod.object({
  * @summary Complete initial user onboarding
  */
 export const OnboardUserBody = zod.object({
+  firstName: zod.string().optional(),
+  lastName: zod.string().optional(),
   age: zod.number().optional(),
   bio: zod.string(),
   role: zod.enum(["student", "coach", "guardian"]).optional(),
