@@ -30,7 +30,7 @@ export function MyAppointmentsPage() {
   return (
     <MainLayout>
       <div className="flex-1 bg-slate-50 pb-12">
-        <div className="bg-[#121c34] text-white pt-10 pb-10 px-4">
+        <div className="bg-[#121c34] text-white pt-10 pb-20 px-4">
           <div className="container mx-auto max-w-4xl">
             <div className="flex items-center gap-3 mb-2">
               <Calendar className="w-7 h-7 text-[#add8e6]" />
@@ -44,7 +44,7 @@ export function MyAppointmentsPage() {
           </div>
         </div>
 
-        <div className="container mx-auto max-w-4xl px-4 -mt-10 space-y-6">
+        <div className="container mx-auto max-w-4xl px-4 -mt-16 space-y-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-24">
               <Loader2 className="w-8 h-8 animate-spin text-[#3131d8]" />

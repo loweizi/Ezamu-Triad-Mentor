@@ -372,7 +372,7 @@ export function StudentDashboardPage() {
     <MainLayout>
       <div className="flex-1 bg-slate-50 pb-12">
         {/* Welcome Header */}
-        <div className="bg-[#121c34] text-white pt-10 pb-10 px-4">
+        <div className="bg-[#121c34] text-white pt-10 pb-20 px-4">
           <div className="container mx-auto max-w-6xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex items-center gap-5">
@@ -407,7 +407,7 @@ export function StudentDashboardPage() {
         </div>
 
         {/* Dashboard Content */}
-        <div className="container mx-auto max-w-6xl px-4 -mt-10">
+        <div className="container mx-auto max-w-6xl px-4 -mt-16">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
             {/* Quick Stats Row */}

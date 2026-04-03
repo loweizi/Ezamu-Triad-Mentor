@@ -46,7 +46,7 @@ export function CoachDashboardPage() {
     <MainLayout>
       <div className="flex-1 bg-slate-50 pb-12">
         {/* Welcome Header */}
-        <div className="bg-[#121c34] text-white pt-10 pb-10 px-4">
+        <div className="bg-[#121c34] text-white pt-10 pb-20 px-4">
           <div className="container mx-auto max-w-6xl">
             <div className="flex items-center gap-5">
               <Avatar className="h-16 w-16 border-2 border-white/20">
@@ -66,7 +66,7 @@ export function CoachDashboardPage() {
         </div>
 
         {/* Dashboard Content */}
-        <div className="container mx-auto max-w-6xl px-4 -mt-10">
+        <div className="container mx-auto max-w-6xl px-4 -mt-16">
 
           {/* Stats row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">

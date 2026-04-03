@@ -265,7 +265,7 @@ export function CoachStudentDetailPage() {
     <MainLayout>
       <div className="flex-1 bg-slate-50 pb-12">
         {/* Header */}
-        <div className="bg-[#121c34] text-white pt-8 pb-10 px-4">
+        <div className="bg-[#121c34] text-white pt-8 pb-20 px-4">
           <div className="container mx-auto max-w-5xl">
             <Link href="/dashboard">
               <button className="flex items-center gap-2 text-white/60 hover:text-white text-sm mb-6 transition-colors">
@@ -299,7 +299,7 @@ export function CoachStudentDetailPage() {
           </div>
         </div>
 
-        <div className="container mx-auto max-w-5xl px-4 -mt-10 space-y-6">
+        <div className="container mx-auto max-w-5xl px-4 -mt-16 space-y-6">
           {/* Info row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <Card className="shadow-md border-none overflow-hidden">

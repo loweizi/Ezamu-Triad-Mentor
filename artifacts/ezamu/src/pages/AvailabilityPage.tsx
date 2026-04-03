@@ -132,7 +132,7 @@ export function AvailabilityPage() {
     <MainLayout>
       <div className="flex-1 bg-slate-50 pb-12">
         {/* Header */}
-        <div className="bg-[#121c34] text-white pt-10 pb-10 px-4">
+        <div className="bg-[#121c34] text-white pt-10 pb-20 px-4">
           <div className="container mx-auto max-w-6xl">
             <div className="flex items-center gap-3 mb-2">
               <CalendarDays className="w-7 h-7 text-[#add8e6]" />
@@ -142,7 +142,7 @@ export function AvailabilityPage() {
           </div>
         </div>
 
-        <div className="container mx-auto max-w-6xl px-4 -mt-10">
+        <div className="container mx-auto max-w-6xl px-4 -mt-16">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
             {/* Left: Calendar + Add Form */}
