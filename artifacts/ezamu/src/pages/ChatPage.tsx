@@ -3,10 +3,24 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useGetConversations, useGetMessages, useSendMessage, getGetConversationsQueryKey, getGetMessagesQueryKey } from "@workspace/api-client-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  useGetConversations,
+  useGetMessages,
+  useSendMessage,
+  useSearchUsers,
+  getGetConversationsQueryKey,
+  getGetMessagesQueryKey,
+} from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Send, User as UserIcon, Loader2, MessageSquare } from "lucide-react";
+import { Send, User as UserIcon, Loader2, MessageSquare, PenSquare, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/useDebounce";
 
 export function ChatPage() {
   const queryClient = useQueryClient();
@@ -14,11 +28,21 @@ export function ChatPage() {
   const [messageText, setMessageText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: conversations, isLoading: isConvLoading } = useGetConversations({ query: { queryKey: getGetConversationsQueryKey() } });
-  
+  // New chat dialog state
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [searchEmail, setSearchEmail] = useState("");
+  const debouncedEmail = useDebounce(searchEmail, 300);
+
+  const { data: conversations, isLoading: isConvLoading } = useGetConversations();
+
   const { data: messages, isLoading: isMsgLoading } = useGetMessages(
     { withUserId: activeUserId! },
     { query: { enabled: !!activeUserId, queryKey: getGetMessagesQueryKey({ withUserId: activeUserId! }) } }
+  );
+
+  const { data: searchResults, isFetching: isSearching } = useSearchUsers(
+    { email: debouncedEmail },
+    { query: { enabled: debouncedEmail.length >= 2 } }
   );
 
   const sendMessage = useSendMessage();
@@ -53,6 +77,14 @@ export function ChatPage() {
     });
   };
 
+  const handleStartChat = (userId: number) => {
+    setActiveUserId(userId);
+    setNewChatOpen(false);
+    setSearchEmail("");
+    // Refresh conversations so the new contact appears in the sidebar
+    queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
+  };
+
   const activeUser = conversations?.find(c => c.userId === activeUserId);
 
   return (
@@ -60,10 +92,19 @@ export function ChatPage() {
       <div className="flex-1 flex overflow-hidden h-[calc(100vh-64px)]">
         {/* Sidebar */}
         <div className="w-full md:w-80 border-r bg-white flex flex-col hidden md:flex">
-          <div className="p-4 border-b">
+          <div className="p-4 border-b flex items-center justify-between">
             <h2 className="text-xl font-serif font-bold text-[#121c34]">Messages</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-[#3131d8] hover:bg-[#3131d8]/10"
+              onClick={() => setNewChatOpen(true)}
+              title="New conversation"
+            >
+              <PenSquare className="w-5 h-5" />
+            </Button>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto">
             {isConvLoading ? (
               <div className="p-4 flex justify-center">
@@ -72,7 +113,15 @@ export function ChatPage() {
             ) : conversations?.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p>No conversations yet.</p>
+                <p className="mb-4">No conversations yet.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-[#3131d8] text-[#3131d8] hover:bg-[#3131d8]/10"
+                  onClick={() => setNewChatOpen(true)}
+                >
+                  Start a conversation
+                </Button>
               </div>
             ) : (
               <div className="divide-y">
@@ -146,8 +195,8 @@ export function ChatPage() {
                       return (
                         <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm ${
-                            isMe 
-                              ? 'bg-[#121c34] text-white rounded-br-none' 
+                            isMe
+                              ? 'bg-[#121c34] text-white rounded-br-none'
                               : 'bg-white border border-slate-100 text-[#121c34] rounded-bl-none'
                           }`}>
                             <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -166,15 +215,15 @@ export function ChatPage() {
               {/* Input Area */}
               <div className="p-4 bg-white border-t">
                 <form onSubmit={handleSend} className="flex gap-2 max-w-4xl mx-auto">
-                  <Input 
-                    placeholder="Type a message..." 
+                  <Input
+                    placeholder="Type a message..."
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
                     className="flex-1 h-12 rounded-full px-6 bg-slate-50 border-slate-200 focus-visible:ring-[#3131d8]"
                   />
-                  <Button 
-                    type="submit" 
-                    size="icon" 
+                  <Button
+                    type="submit"
+                    size="icon"
                     className="h-12 w-12 rounded-full bg-[#121c34] hover:bg-[#121c34]/90 flex-shrink-0"
                     disabled={!messageText.trim() || sendMessage.isPending}
                   >
@@ -187,11 +236,79 @@ export function ChatPage() {
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center bg-white">
               <MessageSquare className="w-16 h-16 mb-4 opacity-20" />
               <h3 className="text-xl font-medium text-[#121c34] mb-2">Your Messages</h3>
-              <p className="max-w-md">Select a conversation from the sidebar to start chatting with your triad members.</p>
+              <p className="max-w-md mb-6">Select a conversation or start a new one by searching for someone.</p>
+              <Button
+                onClick={() => setNewChatOpen(true)}
+                className="bg-[#3131d8] hover:bg-[#3131d8]/90 text-white rounded-full px-6"
+              >
+                <PenSquare className="w-4 h-4 mr-2" />
+                New Conversation
+              </Button>
             </div>
           )}
         </div>
       </div>
+
+      {/* New Chat Dialog */}
+      <Dialog open={newChatOpen} onOpenChange={(open) => { setNewChatOpen(open); if (!open) setSearchEmail(""); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#121c34] font-serif text-xl">New Conversation</DialogTitle>
+          </DialogHeader>
+
+          <div className="mt-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                autoFocus
+                placeholder="Search by email address..."
+                value={searchEmail}
+                onChange={(e) => setSearchEmail(e.target.value)}
+                className="pl-9 h-11 focus-visible:ring-[#3131d8]"
+              />
+              {isSearching && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+
+            <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-slate-100">
+              {debouncedEmail.length < 2 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">
+                  Type at least 2 characters to search
+                </div>
+              ) : searchResults && searchResults.length === 0 && !isSearching ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">
+                  No users found for <span className="font-medium text-[#121c34]">"{debouncedEmail}"</span>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {searchResults?.map(user => (
+                    <button
+                      key={user.id}
+                      onClick={() => handleStartChat(user.id)}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors text-left"
+                    >
+                      <Avatar className="h-10 w-10 border border-slate-100">
+                        <AvatarImage src={user.profilePicUrl || undefined} />
+                        <AvatarFallback className="bg-[#607b7d] text-white text-sm">
+                          {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[#121c34] truncate">{user.firstName} {user.lastName}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                      </div>
+                      <span className="text-xs capitalize px-2 py-0.5 rounded-full bg-[#3131d8]/10 text-[#3131d8] font-medium flex-shrink-0">
+                        {user.role}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
