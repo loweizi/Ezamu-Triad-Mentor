@@ -4,11 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useGetCoach, useGetCoachAvailability, useCreateAppointment, getGetCoachQueryKey, getGetCoachAvailabilityQueryKey, getGetAppointmentsQueryKey } from "@workspace/api-client-react";
 import { useParams, useLocation } from "wouter";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { Calendar as CalendarIcon, Clock, ChevronLeft, Loader2, Info } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, ChevronLeft, Loader2, Info, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -26,6 +34,7 @@ export function CoachProfilePage() {
   const queryClient = useQueryClient();
   
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [pendingSlot, setPendingSlot] = useState<{ id: number; date: string; startTime: string; endTime: string } | null>(null);
   
   const id = parseInt(coachId || "0");
   
@@ -48,18 +57,29 @@ export function CoachProfilePage() {
     setSelectedDate(availableDates[0]);
   }
 
-  const handleBook = (slot: any) => {
+  // Step 1: clicking a slot opens the confirmation dialog
+  const handleSlotClick = (slot: any) => {
+    setPendingSlot(slot);
+  };
+
+  // Step 2: user confirms → book and remove the slot
+  const handleConfirmBook = () => {
+    if (!pendingSlot) return;
     createAppointment.mutate({
       data: {
         coachId: id,
         title: `Mentorship Session with ${coach?.firstName}`,
-        scheduledAt: new Date(`${slot.date}T${slot.startTime.substring(0, 5)}`).toISOString()
+        scheduledAt: new Date(`${pendingSlot.date}T${pendingSlot.startTime.substring(0, 5)}`).toISOString(),
+        // @ts-ignore — availabilitySlotId is handled by the server outside the zod schema
+        availabilitySlotId: pendingSlot.id,
       }
     }, {
       onSuccess: () => {
-        toast.success("Appointment booked successfully!");
+        setPendingSlot(null);
+        toast.success("Appointment booked! See you then.");
         queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
-        setLocation("/dashboard");
+        queryClient.invalidateQueries({ queryKey: getGetCoachAvailabilityQueryKey({ coachId: id }) });
+        setLocation("/my-appointments");
       },
       onError: () => {
         toast.error("Failed to book appointment. Please try again.");
@@ -190,7 +210,7 @@ export function CoachProfilePage() {
                                 key={slot.id}
                                 variant="outline"
                                 className="h-12 border-slate-200 hover:border-[#3131d8] hover:text-[#3131d8] font-medium"
-                                onClick={() => handleBook(slot)}
+                                onClick={() => handleSlotClick(slot)}
                                 disabled={createAppointment.isPending}
                               >
                                 {formatSlotTime(slot.startTime)}
@@ -234,6 +254,74 @@ export function CoachProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Booking Confirmation Dialog */}
+      <Dialog open={!!pendingSlot} onOpenChange={(open) => { if (!open) setPendingSlot(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className="flex justify-center mb-3">
+              <div className="w-12 h-12 rounded-full bg-[#3131d8]/10 flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6 text-[#3131d8]" />
+              </div>
+            </div>
+            <DialogTitle className="text-center text-[#121c34] font-serif text-xl">
+              Confirm Your Booking
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              You're about to book a session with {coach?.firstName} {coach?.lastName}.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingSlot && (
+            <div className="my-2 rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#121c34]/10 flex items-center justify-center flex-shrink-0">
+                  <CalendarIcon className="w-4 h-4 text-[#121c34]" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Date</p>
+                  <p className="text-sm font-semibold text-[#121c34]">
+                    {format(parseISO(pendingSlot.date), "EEEE, MMMM d, yyyy")}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#121c34]/10 flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-4 h-4 text-[#121c34]" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Time</p>
+                  <p className="text-sm font-semibold text-[#121c34]">
+                    {formatSlotTime(pendingSlot.startTime)} – {formatSlotTime(pendingSlot.endTime)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setPendingSlot(null)}
+              disabled={createAppointment.isPending}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmBook}
+              disabled={createAppointment.isPending}
+              className="flex-1 bg-[#3131d8] hover:bg-[#3131d8]/90 text-white border-none"
+            >
+              {createAppointment.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Booking…</>
+              ) : (
+                "Confirm Booking"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

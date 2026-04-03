@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, or, and, gte } from "drizzle-orm";
-import { db, appointmentsTable, usersTable } from "@workspace/db";
+import { db, appointmentsTable, usersTable, coachAvailabilityTable } from "@workspace/db";
 import {
   GetAppointmentsResponseItem,
   CreateAppointmentBody,
@@ -67,6 +67,13 @@ router.post("/appointments", requireAuth, async (req, res): Promise<void> => {
     scheduledAt: new Date(parsed.data.scheduledAt),
     status: "pending",
   }).returning();
+
+  // Remove the booked availability slot so no other student can book the same time
+  const slotId = typeof req.body.availabilitySlotId === "number" ? req.body.availabilitySlotId : null;
+  if (slotId) {
+    await db.delete(coachAvailabilityTable).where(eq(coachAvailabilityTable.id, slotId));
+  }
+
   const formatted = await formatAppointment(appt);
   res.status(201).json(GetAppointmentResponse.parse(formatted));
 });
