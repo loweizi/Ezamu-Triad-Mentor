@@ -70,8 +70,8 @@ export function MyAppointmentsPage() {
             <>
               {upcoming.length > 0 && (
                 <section>
-                  <h2 className="text-lg font-serif font-bold text-[#121c34] mb-3 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#3131d8] inline-block" />
+                  <h2 className="text-lg font-serif font-bold text-white mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#add8e6] inline-block" />
                     Upcoming ({upcoming.length})
                   </h2>
                   <div className="space-y-3">
@@ -84,8 +84,8 @@ export function MyAppointmentsPage() {
 
               {past.length > 0 && (
                 <section>
-                  <h2 className="text-lg font-serif font-bold text-[#121c34] mb-3 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />
+                  <h2 className="text-lg font-serif font-bold text-white mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-white/50 inline-block" />
                     Past ({past.length})
                   </h2>
                   <div className="space-y-3 opacity-75">
