@@ -1,20 +1,331 @@
+import { useState, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe } from "@workspace/api-client-react";
-import { Link } from "wouter";
-import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, type SmartGoal } from "@workspace/api-client-react";
+import { Link } from "wouter";
+import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2, Plus, Target, Clock, CheckCheck, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { format, formatDistanceToNow, isPast, parseISO } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+
+const SMART_FIELDS = [
+  {
+    key: "specific" as const,
+    label: "Specific",
+    letter: "S",
+    question: "What exactly do you want to achieve?",
+    placeholder: "e.g. I want to improve my algebra grade from a C to a B+",
+    color: "#3131d8",
+  },
+  {
+    key: "measurable" as const,
+    label: "Measurable",
+    letter: "M",
+    question: "How will you know when you've achieved it?",
+    placeholder: "e.g. My next test score will be 80% or above, and I'll track weekly quiz results",
+    color: "#607b7d",
+  },
+  {
+    key: "achievable" as const,
+    label: "Achievable",
+    letter: "A",
+    question: "Why is this goal realistic for you right now?",
+    placeholder: "e.g. I already attend tutoring twice a week and can add 30 minutes of daily practice",
+    color: "#bb7e5d",
+  },
+  {
+    key: "relevant" as const,
+    label: "Relevant",
+    letter: "R",
+    question: "Why does this matter to your bigger goals?",
+    placeholder: "e.g. Strong math skills are required for the engineering programme I want to apply to",
+    color: "#dbb68f",
+  },
+];
+
+const STATUS_CONFIG = {
+  pending: { label: "Awaiting Review", icon: Clock, className: "bg-amber-50 text-amber-700 border-amber-200" },
+  approved: { label: "Approved", icon: CheckCheck, className: "bg-green-50 text-green-700 border-green-200" },
+  denied: { label: "Needs Revision", icon: XCircle, className: "bg-red-50 text-red-700 border-red-200" },
+};
+
+function GoalCard({ goal }: { goal: SmartGoal }) {
+  const [expanded, setExpanded] = useState(false);
+  const { label, icon: Icon, className } = STATUS_CONFIG[goal.status];
+  const isPastDue = isPast(parseISO(goal.timeBound)) && goal.status !== "approved";
+
+  return (
+    <div className="border rounded-xl overflow-hidden bg-white">
+      <div className="p-4 flex items-start gap-4">
+        <div className="w-10 h-10 rounded-xl bg-[#121c34] flex items-center justify-center flex-shrink-0 mt-0.5">
+          <Target className="w-5 h-5 text-[#add8e6]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <p className="font-semibold text-[#121c34] text-base">{goal.title}</p>
+            <Badge variant="outline" className={`text-xs flex items-center gap-1 flex-shrink-0 ${className}`}>
+              <Icon className="w-3 h-3" />
+              {label}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            <span className={`text-xs flex items-center gap-1 ${isPastDue ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+              <Calendar className="w-3 h-3" />
+              Due {format(parseISO(goal.timeBound), "MMM d, yyyy")}
+              {isPastDue && " · Overdue"}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Created {formatDistanceToNow(parseISO(goal.createdAt), { addSuffix: true })}
+            </span>
+          </div>
+
+          {goal.status === "denied" && goal.coachFeedback && (
+            <div className="mt-3 p-3 rounded-lg bg-red-50 border border-red-100">
+              <p className="text-xs font-semibold text-red-700 mb-1">Coach Feedback</p>
+              <p className="text-sm text-red-800">{goal.coachFeedback}</p>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="flex-shrink-0 text-muted-foreground hover:text-[#121c34] transition-colors mt-0.5"
+        >
+          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="border-t px-4 pb-4 pt-3 bg-slate-50 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {SMART_FIELDS.map(f => (
+            <div key={f.key} className="space-y-1">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="w-5 h-5 rounded text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: f.color }}
+                >
+                  {f.letter}
+                </span>
+                <p className="text-xs font-semibold text-[#121c34]">{f.label}</p>
+              </div>
+              <p className="text-sm text-muted-foreground pl-6.5 leading-relaxed">{goal[f.key]}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NewGoalDialog({
+  open,
+  onOpenChange,
+  coachId,
+  coachOptions,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  coachId: number | null;
+  coachOptions: { id: number; name: string }[];
+}) {
+  const { toast } = useToast();
+  const createGoal = useCreateSmartGoal();
+
+  const [selectedCoachId, setSelectedCoachId] = useState<number | null>(coachId);
+  const [title, setTitle] = useState("");
+  const [timeBound, setTimeBound] = useState("");
+  const [fields, setFields] = useState({ specific: "", measurable: "", achievable: "", relevant: "" });
+
+  const resetForm = () => {
+    setTitle("");
+    setTimeBound("");
+    setFields({ specific: "", measurable: "", achievable: "", relevant: "" });
+    setSelectedCoachId(coachId);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCoachId) { toast({ title: "Select a coach first", variant: "destructive" }); return; }
+    if (!title.trim()) { toast({ title: "Please add a title", variant: "destructive" }); return; }
+    if (!timeBound) { toast({ title: "Please set a target date", variant: "destructive" }); return; }
+    for (const f of SMART_FIELDS) {
+      if (!fields[f.key].trim()) { toast({ title: `Please fill in the "${f.label}" field`, variant: "destructive" }); return; }
+    }
+
+    try {
+      await createGoal.mutateAsync({
+        coachId: selectedCoachId,
+        title: title.trim(),
+        specific: fields.specific.trim(),
+        measurable: fields.measurable.trim(),
+        achievable: fields.achievable.trim(),
+        relevant: fields.relevant.trim(),
+        timeBound: new Date(timeBound).toISOString(),
+      });
+      toast({ title: "Goal submitted!", description: "Your coach will review it soon." });
+      resetForm();
+      onOpenChange(false);
+    } catch {
+      toast({ title: "Failed to create goal", variant: "destructive" });
+    }
+  };
+
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-serif text-[#121c34] flex items-center gap-2">
+            <Target className="w-6 h-6 text-[#3131d8]" />
+            New SMART Goal
+          </DialogTitle>
+          <DialogDescription>
+            SMART goals are <strong>Specific</strong>, <strong>Measurable</strong>, <strong>Achievable</strong>, <strong>Relevant</strong>, and <strong>Time-bound</strong>. Fill in each section to create a well-structured goal your coach can review and approve.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-5 mt-2">
+          {/* Coach selector */}
+          {coachOptions.length > 1 && (
+            <div className="space-y-1.5">
+              <Label>Which coach is this goal for?</Label>
+              <select
+                value={selectedCoachId ?? ""}
+                onChange={e => setSelectedCoachId(Number(e.target.value))}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3131d8]/30 focus:border-[#3131d8] bg-white"
+              >
+                <option value="">Select a coach…</option>
+                {coachOptions.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Title */}
+          <div className="space-y-1.5">
+            <Label htmlFor="goal-title">Goal Title</Label>
+            <Input
+              id="goal-title"
+              placeholder="e.g. Improve algebra grade to B+"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="h-11"
+            />
+          </div>
+
+          {/* Target Date */}
+          <div className="space-y-1.5">
+            <Label htmlFor="time-bound" className="flex items-center gap-1.5">
+              <span
+                className="w-5 h-5 rounded text-white text-[10px] font-bold flex items-center justify-center"
+                style={{ backgroundColor: "#121c34" }}
+              >
+                T
+              </span>
+              Target Completion Date
+            </Label>
+            <p className="text-xs text-muted-foreground">When do you aim to have this goal completed by?</p>
+            <Input
+              id="time-bound"
+              type="date"
+              min={today}
+              value={timeBound}
+              onChange={e => setTimeBound(e.target.value)}
+              className="h-11"
+            />
+          </div>
+
+          {/* Divider */}
+          <div className="border-t pt-4">
+            <p className="text-sm font-semibold text-[#121c34] mb-4">Break it down with SMART criteria</p>
+            <div className="space-y-4">
+              {SMART_FIELDS.map(f => (
+                <div key={f.key} className="space-y-1.5">
+                  <Label htmlFor={`field-${f.key}`} className="flex items-center gap-1.5">
+                    <span
+                      className="w-5 h-5 rounded text-white text-[10px] font-bold flex items-center justify-center"
+                      style={{ backgroundColor: f.color }}
+                    >
+                      {f.letter}
+                    </span>
+                    {f.label} — <span className="text-muted-foreground font-normal">{f.question}</span>
+                  </Label>
+                  <Textarea
+                    id={`field-${f.key}`}
+                    placeholder={f.placeholder}
+                    value={fields[f.key]}
+                    onChange={e => setFields(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    className="min-h-[80px] resize-none text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 border-t">
+            <Button type="button" variant="outline" onClick={() => { resetForm(); onOpenChange(false); }}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={createGoal.isPending}
+              className="bg-[#3131d8] hover:bg-[#3131d8]/90 text-white border-none"
+            >
+              {createGoal.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              Submit Goal
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function StudentDashboardPage() {
+  const { toast } = useToast();
   const { data: user } = useGetMe();
   const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary();
   const { data: actionItems, isLoading: isItemsLoading } = useGetActionItems();
   const { data: appointments, isLoading: isAppointmentsLoading } = useGetAppointments();
+  const { data: smartGoals = [], isLoading: isGoalsLoading } = useGetSmartGoals();
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false);
+  const [goalsFilter, setGoalsFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
 
   const isLoading = isSummaryLoading || isItemsLoading || isAppointmentsLoading;
+
+  const coachOptions = useMemo(() => {
+    if (!appointments) return [];
+    const seen = new Set<number>();
+    const coaches: { id: number; name: string }[] = [];
+    for (const a of appointments) {
+      const id = (a as any).coachId as number;
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        coaches.push({ id, name: (a as any).coachName as string ?? "Your Coach" });
+      }
+    }
+    return coaches;
+  }, [appointments]);
+
+  const defaultCoachId = coachOptions.length === 1 ? coachOptions[0].id : null;
+
+  const filteredGoals = useMemo(() => {
+    if (goalsFilter === "all") return smartGoals;
+    return smartGoals.filter(g => g.status === goalsFilter);
+  }, [smartGoals, goalsFilter]);
 
   if (isLoading) {
     return (
@@ -29,6 +340,12 @@ export function StudentDashboardPage() {
 
   const pendingItems = actionItems?.filter(i => !i.completed) || [];
   const upcomingAppointments = appointments?.filter(a => new Date(a.scheduledAt) > new Date()).slice(0, 3) || [];
+
+  const goalCounts = {
+    pending: smartGoals.filter(g => g.status === "pending").length,
+    approved: smartGoals.filter(g => g.status === "approved").length,
+    denied: smartGoals.filter(g => g.status === "denied").length,
+  };
 
   return (
     <MainLayout>
@@ -108,12 +425,17 @@ export function StudentDashboardPage() {
               <div className="h-1 bg-[#bb7e5d]"></div>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-                  <MessageCircle className="w-4 h-4 mr-2 text-[#bb7e5d]" />
-                  Unread Messages
+                  <Target className="w-4 h-4 mr-2 text-[#bb7e5d]" />
+                  SMART Goals
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-[#121c34]">{summary?.unreadMessagesCount || 0}</div>
+                <div className="text-3xl font-bold text-[#121c34]">
+                  {goalCounts.approved}{" "}
+                  <span className="text-muted-foreground text-xl font-normal">
+                    / {smartGoals.length} approved
+                  </span>
+                </div>
               </CardContent>
             </Card>
 
@@ -155,6 +477,104 @@ export function StudentDashboardPage() {
                       </div>
                       <p className="text-[#121c34] font-medium">All caught up!</p>
                       <p className="text-sm text-muted-foreground mt-1">You have no pending action items.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* ── SMART Goals Section ── */}
+              <Card className="shadow-sm border-none">
+                <CardHeader className="border-b bg-slate-50/50 pb-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-xl font-serif text-[#121c34] flex items-center gap-2">
+                        <Target className="w-5 h-5 text-[#3131d8]" />
+                        My SMART Goals
+                      </CardTitle>
+                      <CardDescription className="mt-1">
+                        Set structured goals for your coach to review and approve
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        if (coachOptions.length === 0) {
+                          toast({ title: "No coach connected yet", description: "Book a session with a coach first, then you can set SMART goals." });
+                          return;
+                        }
+                        setGoalDialogOpen(true);
+                      }}
+                      className="flex-shrink-0 bg-[#3131d8] hover:bg-[#3131d8]/90 text-white border-none"
+                      size="sm"
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
+                      New Goal
+                    </Button>
+                  </div>
+
+                  {/* Status Filter Pills */}
+                  {smartGoals.length > 0 && (
+                    <div className="flex gap-2 mt-3 flex-wrap">
+                      {(["all", "pending", "approved", "denied"] as const).map(status => (
+                        <button
+                          key={status}
+                          onClick={() => setGoalsFilter(status)}
+                          className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
+                            goalsFilter === status
+                              ? "bg-[#121c34] text-white border-[#121c34]"
+                              : "bg-white text-[#121c34]/60 border-slate-200 hover:border-[#121c34]/40"
+                          }`}
+                        >
+                          {status === "all" ? `All (${smartGoals.length})` :
+                           status === "pending" ? `Awaiting Review (${goalCounts.pending})` :
+                           status === "approved" ? `Approved (${goalCounts.approved})` :
+                           `Needs Revision (${goalCounts.denied})`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardHeader>
+
+                <CardContent className="p-4">
+                  {isGoalsLoading ? (
+                    <div className="py-8 flex justify-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-[#3131d8]" />
+                    </div>
+                  ) : filteredGoals.length === 0 ? (
+                    <div className="py-10 text-center flex flex-col items-center">
+                      <div className="w-14 h-14 bg-[#3131d8]/5 rounded-2xl flex items-center justify-center mb-4">
+                        <Target className="w-7 h-7 text-[#3131d8]" />
+                      </div>
+                      <p className="text-[#121c34] font-semibold text-lg font-serif">
+                        {goalsFilter === "all" ? "No goals yet" : `No ${goalsFilter} goals`}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+                        {goalsFilter === "all"
+                          ? "SMART goals help you set clear targets. Create your first one and share it with your coach."
+                          : "Try switching the filter above to see other goals."}
+                      </p>
+                      {goalsFilter === "all" && coachOptions.length > 0 && (
+                        <Button
+                          onClick={() => setGoalDialogOpen(true)}
+                          className="mt-4 bg-[#3131d8] hover:bg-[#3131d8]/90 text-white border-none"
+                          size="sm"
+                        >
+                          <Plus className="w-4 h-4 mr-1.5" />
+                          Create Your First Goal
+                        </Button>
+                      )}
+                      {goalsFilter === "all" && coachOptions.length === 0 && (
+                        <Link href="/appointments">
+                          <Button variant="outline" size="sm" className="mt-4 border-dashed">
+                            Book a Session First
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredGoals
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map(goal => <GoalCard key={goal.id} goal={goal} />)}
                     </div>
                   )}
                 </CardContent>
@@ -226,10 +646,47 @@ export function StudentDashboardPage() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Goal Summary Card */}
+              {smartGoals.length > 0 && (
+                <Card className="shadow-sm border-none">
+                  <CardHeader className="pb-3 border-b">
+                    <CardTitle className="text-base font-serif text-[#121c34]">Goal Progress</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-3">
+                    {[
+                      { status: "approved", label: "Approved", color: "bg-green-500" },
+                      { status: "pending", label: "Awaiting Review", color: "bg-amber-400" },
+                      { status: "denied", label: "Needs Revision", color: "bg-red-400" },
+                    ].map(({ status, label, color }) => {
+                      const count = goalCounts[status as keyof typeof goalCounts];
+                      const pct = smartGoals.length > 0 ? Math.round((count / smartGoals.length) * 100) : 0;
+                      return (
+                        <div key={status}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-muted-foreground">{label}</span>
+                            <span className="font-semibold text-[#121c34]">{count}</span>
+                          </div>
+                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      <NewGoalDialog
+        open={goalDialogOpen}
+        onOpenChange={setGoalDialogOpen}
+        coachId={defaultCoachId}
+        coachOptions={coachOptions}
+      />
     </MainLayout>
   );
 }
