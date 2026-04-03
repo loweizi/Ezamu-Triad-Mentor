@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,24 @@ import { useGetMe, useUpdateMe, getGetMeQueryKey } from "@workspace/api-client-r
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Camera, Save, Check } from "lucide-react";
+
+function resizeImageToDataUrl(file: File, maxPx = 400): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
 
 const ALL_FIELDS = [
   "Science & Math", "Coding & Tech", "Arts & Design", 
@@ -27,6 +45,8 @@ export function ProfilePage() {
   const [bio, setBio] = useState("");
   const [age, setAge] = useState("");
   const [fields, setFields] = useState<string[]>([]);
+  const [uploadingPic, setUploadingPic] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -37,6 +57,27 @@ export function ProfilePage() {
       setFields(user.role === 'coach' ? user.fieldsOfExpertise : user.fieldsOfInterest);
     }
   }, [user]);
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+    setUploadingPic(true);
+    try {
+      const dataUrl = await resizeImageToDataUrl(file);
+      await updateMe.mutateAsync({ data: { profilePicUrl: dataUrl } });
+      queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+      toast.success("Profile picture updated");
+    } catch {
+      toast.error("Failed to upload picture");
+    } finally {
+      setUploadingPic(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleFieldToggle = (field: string) => {
     setFields(prev => 
@@ -92,14 +133,44 @@ export function ProfilePage() {
               <Card className="border-none shadow-sm">
                 <CardContent className="p-6 flex flex-col items-center text-center">
                   <div className="relative mb-4 group">
-                    <Avatar className="h-32 w-32 border-4 border-white shadow-md">
-                      <AvatarImage src={user?.profilePicUrl || undefined} />
-                      <AvatarFallback className="bg-[#121c34] text-white text-3xl">
-                        {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <button className="absolute bottom-0 right-0 p-2 bg-[#dbb68f] text-[#121c34] rounded-full shadow-lg hover:bg-[#dbb68f]/90 transition-colors">
-                      <Camera className="w-4 h-4" />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingPic}
+                      className="relative block focus:outline-none"
+                      title="Change profile picture"
+                    >
+                      <Avatar className="h-32 w-32 border-4 border-white shadow-md">
+                        <AvatarImage src={user?.profilePicUrl || undefined} />
+                        <AvatarFallback className="bg-[#121c34] text-white text-3xl">
+                          {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        {uploadingPic
+                          ? <Loader2 className="w-6 h-6 text-white animate-spin" />
+                          : <Camera className="w-6 h-6 text-white" />
+                        }
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingPic}
+                      className="absolute bottom-0 right-0 p-2 bg-[#dbb68f] text-[#121c34] rounded-full shadow-lg hover:bg-[#dbb68f]/90 transition-colors disabled:opacity-60"
+                      title="Change profile picture"
+                    >
+                      {uploadingPic
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <Camera className="w-4 h-4" />
+                      }
                     </button>
                   </div>
                   <h2 className="text-xl font-bold text-[#121c34]">{user?.firstName} {user?.lastName}</h2>
