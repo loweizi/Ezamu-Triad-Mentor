@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useSaveAssessmentResult, useGetMe, SaveAssessmentBodyInnerHeroType } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { ChevronRight, ArrowUp, ArrowDown, Activity, Sparkles, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Sparkles, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 const QUESTIONS = [
@@ -36,6 +36,20 @@ export function AssessmentPage() {
   // For ranking
   const [rankingOrder, setRankingOrder] = useState<number[]>([0, 1, 2, 3]);
 
+  // Timeout ref for single-select auto-advance
+  const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Restore multi/ranking state when navigating between questions
+  useEffect(() => {
+    const q = QUESTIONS[currentStep];
+    if (q.type === "multi") {
+      setCurrentMultiSelection(answers[q.id] ?? []);
+    }
+    if (q.type === "ranking") {
+      setRankingOrder(answers[q.id] ?? [0, 1, 2, 3]);
+    }
+  }, [currentStep]);
+
   if (isUserLoading) {
     return (
       <MainLayout>
@@ -49,9 +63,17 @@ export function AssessmentPage() {
   const question = QUESTIONS[currentStep];
   const progress = ((currentStep) / QUESTIONS.length) * 100;
 
+  const goBack = () => {
+    if (advanceTimeoutRef.current) {
+      clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = null;
+    }
+    setCurrentStep(prev => Math.max(0, prev - 1));
+  };
+
   const handleSingleSelect = (optionIndex: number) => {
     setAnswers(prev => ({ ...prev, [question.id]: [optionIndex] }));
-    setTimeout(() => advanceStep(), 400); // slight delay for visual feedback
+    advanceTimeoutRef.current = setTimeout(() => advanceStep(), 400);
   };
 
   const handleMultiSelect = (optionIndex: number) => {
@@ -246,8 +268,21 @@ export function AssessmentPage() {
       <div className="flex-1 flex flex-col bg-white">
         {/* Progress header */}
         <div className="sticky top-0 z-10 bg-white border-b p-4">
-          <div className="container mx-auto max-w-3xl flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-muted-foreground">Question {currentStep + 1} of {QUESTIONS.length}</span>
+          <div className="container mx-auto max-w-3xl flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              {currentStep > 0 && (
+                <button
+                  onClick={goBack}
+                  className="flex items-center gap-1.5 text-sm font-medium text-[#121c34]/60 hover:text-[#121c34] transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Back
+                </button>
+              )}
+              <span className="text-sm font-medium text-muted-foreground">
+                Question {currentStep + 1} of {QUESTIONS.length}
+              </span>
+            </div>
             <span className="text-sm font-bold text-[#121c34]">{Math.round(progress)}%</span>
           </div>
           <div className="container mx-auto max-w-3xl">
