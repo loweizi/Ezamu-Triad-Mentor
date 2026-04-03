@@ -6,17 +6,22 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   useGetMyStudentDetail,
   useGetSmartGoals,
   useUpdateSmartGoal,
   useGetCoachNote,
   useSaveCoachNote,
+  useCreateActionItem,
+  useGetActionItems,
   type SmartGoal,
 } from "@workspace/api-client-react";
 import {
   ArrowLeft, Loader2, User, Calendar, Target, FileText,
   Check, X, ChevronDown, ChevronUp, Clock, BookOpen, Save,
+  ListChecks, Plus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -177,10 +182,15 @@ export function CoachStudentDetailPage() {
   const { data: student, isLoading: isStudentLoading } = useGetMyStudentDetail(isNaN(studentId) ? null : studentId);
   const { data: goals, isLoading: isGoalsLoading } = useGetSmartGoals(isNaN(studentId) ? undefined : studentId);
   const { data: noteData, isLoading: isNoteLoading } = useGetCoachNote(isNaN(studentId) ? null : studentId);
+  const { data: existingItems } = useGetActionItems();
   const saveNote = useSaveCoachNote();
+  const createActionItem = useCreateActionItem();
 
   const [noteContent, setNoteContent] = useState("");
   const [noteSaved, setNoteSaved] = useState(false);
+  const [newItemTitle, setNewItemTitle] = useState("");
+  const [newItemDescription, setNewItemDescription] = useState("");
+  const [newItemGoalId, setNewItemGoalId] = useState<number | null>(null);
 
   useEffect(() => {
     if (noteData?.content !== undefined) {
@@ -195,6 +205,27 @@ export function CoachStudentDetailPage() {
       setTimeout(() => setNoteSaved(false), 2000);
     } catch {
       toast({ title: "Error", description: "Failed to save note.", variant: "destructive" });
+    }
+  };
+
+  const handleCreateActionItem = async () => {
+    if (!newItemTitle.trim()) {
+      toast({ title: "Title required", description: "Please enter a title for the action item.", variant: "destructive" });
+      return;
+    }
+    try {
+      await createActionItem.mutateAsync({
+        studentId,
+        title: newItemTitle.trim(),
+        description: newItemDescription.trim() || null,
+        smartGoalId: newItemGoalId ?? null,
+      });
+      setNewItemTitle("");
+      setNewItemDescription("");
+      setNewItemGoalId(null);
+      toast({ title: "Action item assigned!", description: "The student will see it on their dashboard." });
+    } catch {
+      toast({ title: "Error", description: "Failed to assign action item.", variant: "destructive" });
     }
   };
 
@@ -458,6 +489,116 @@ export function CoachStudentDetailPage() {
                   )}
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Assign Action Items */}
+          <Card className="shadow-sm border-none">
+            <CardHeader className="border-b bg-slate-50/50 flex flex-row items-start justify-between pb-4">
+              <div>
+                <CardTitle className="text-xl font-serif text-[#121c34] flex items-center gap-2">
+                  <ListChecks className="w-5 h-5 text-[#607b7d]" />
+                  Action Items
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Assign tasks to help {student.firstName} work toward their SMART goals</p>
+              </div>
+              {(existingItems || []).filter(i => i.studentId === studentId && !i.completed).length > 0 && (
+                <Badge className="bg-[#607b7d]/10 text-[#607b7d] border-[#607b7d]/20 border text-xs mt-1">
+                  {(existingItems || []).filter(i => i.studentId === studentId && !i.completed).length} active
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent className="pt-5 space-y-5">
+
+              {/* Existing items */}
+              {(existingItems || []).filter(i => i.studentId === studentId).length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assigned items</p>
+                  <div className="divide-y border rounded-xl overflow-hidden">
+                    {(existingItems || []).filter(i => i.studentId === studentId).map(item => (
+                      <div key={item.id} className="px-4 py-3 flex items-start gap-3 bg-white">
+                        <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 ${item.completed ? "bg-green-500 border-green-500" : "border-slate-300"}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${item.completed ? "line-through text-muted-foreground" : "text-[#121c34]"}`}>
+                            {item.title}
+                          </p>
+                          {item.smartGoalTitle && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-[#3131d8] mt-0.5">
+                              <Target className="w-2.5 h-2.5" />
+                              {item.smartGoalTitle}
+                            </span>
+                          )}
+                        </div>
+                        {item.completed && (
+                          <Badge className="bg-green-100 text-green-700 border-green-200 border text-xs flex-shrink-0">Done</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add new item form */}
+              <div className="border rounded-xl p-4 bg-slate-50/50 space-y-4">
+                <p className="text-sm font-semibold text-[#121c34]">Assign a new task</p>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Title <span className="text-red-500">*</span></Label>
+                  <Input
+                    value={newItemTitle}
+                    onChange={e => setNewItemTitle(e.target.value)}
+                    placeholder="e.g. Research meditation techniques"
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Description (optional)</Label>
+                  <textarea
+                    value={newItemDescription}
+                    onChange={e => setNewItemDescription(e.target.value)}
+                    placeholder="Add more context or instructions..."
+                    rows={3}
+                    className="w-full text-sm border rounded-lg p-3 resize-none bg-white focus:outline-none focus:ring-2 focus:ring-[#3131d8]/30 focus:border-[#3131d8]"
+                  />
+                </div>
+                {approvedGoals.length > 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Link to an approved SMART goal (optional)</Label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setNewItemGoalId(null)}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${newItemGoalId === null ? "bg-[#121c34] text-white border-[#121c34]" : "bg-white text-[#121c34]/60 border-slate-200 hover:border-[#121c34]/40"}`}
+                      >
+                        No goal link
+                      </button>
+                      {approvedGoals.map(goal => (
+                        <button
+                          key={goal.id}
+                          onClick={() => setNewItemGoalId(goal.id)}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1.5 ${newItemGoalId === goal.id ? "bg-[#3131d8] text-white border-[#3131d8]" : "bg-white text-[#121c34]/60 border-slate-200 hover:border-[#3131d8]/40"}`}
+                        >
+                          <Target className="w-3 h-3" />
+                          {goal.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleCreateActionItem}
+                    disabled={createActionItem.isPending || !newItemTitle.trim()}
+                    className="bg-[#3131d8] hover:bg-[#3131d8]/90 text-white border-none flex items-center gap-2"
+                    size="sm"
+                  >
+                    {createActionItem.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                    Assign Task
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

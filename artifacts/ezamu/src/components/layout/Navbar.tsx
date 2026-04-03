@@ -13,12 +13,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
-import { useGetMe } from "@workspace/api-client-react";
+import { useGetMe, useGetDashboardSummary } from "@workspace/api-client-react";
 
 export function Navbar() {
   const { signOut } = useClerk();
   const { user, isLoaded } = useUser();
   const { data: appUser } = useGetMe();
+  const { data: dashboardSummary } = useGetDashboardSummary();
+  const unreadCount = dashboardSummary?.unreadMessagesCount || 0;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
 
@@ -85,8 +87,13 @@ export function Navbar() {
             </Link>
 
             <div className={`flex items-center gap-4 ml-4 pl-4 ${dividerClass}`}>
-              <Link href="/chat" className={isHome ? "text-[#121c34]/70 hover:text-[#121c34] transition-colors" : "text-white/80 hover:text-white transition-colors"}>
+              <Link href="/chat" className={`relative ${isHome ? "text-[#121c34]/70 hover:text-[#121c34] transition-colors" : "text-white/80 hover:text-white transition-colors"}`}>
                 <MessageCircle className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5 leading-none">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </Link>
 
               <DropdownMenu>

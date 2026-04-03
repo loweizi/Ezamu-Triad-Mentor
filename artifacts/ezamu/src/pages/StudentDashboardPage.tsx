@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, type SmartGoal } from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, type SmartGoal, type ActionItem } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2, Plus, Target, Clock, CheckCheck, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { format, formatDistanceToNow, isPast, parseISO } from "date-fns";
@@ -303,6 +303,7 @@ export function StudentDashboardPage() {
   const { data: smartGoals = [], isLoading: isGoalsLoading } = useGetSmartGoals();
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
   const [goalsFilter, setGoalsFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
+  const [selectedItem, setSelectedItem] = useState<ActionItem | null>(null);
 
   const isLoading = isSummaryLoading || isItemsLoading || isAppointmentsLoading;
 
@@ -457,17 +458,28 @@ export function StudentDashboardPage() {
                   {pendingItems.length > 0 ? (
                     <div className="divide-y">
                       {pendingItems.map(item => (
-                        <div key={item.id} className="p-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-                          <button className="mt-1 flex-shrink-0 text-slate-300 hover:text-[#607b7d] transition-colors">
+                        <button
+                          key={item.id}
+                          onClick={() => setSelectedItem(item)}
+                          className="w-full p-4 flex items-start gap-4 hover:bg-slate-50 transition-colors text-left"
+                        >
+                          <span className="mt-1 flex-shrink-0 text-slate-300">
                             <CheckCircle2 className="w-5 h-5" />
-                          </button>
+                          </span>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-[#121c34] truncate">{item.title}</p>
+                            {item.smartGoalTitle && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#3131d8] bg-[#3131d8]/8 rounded px-1.5 py-0.5 mt-1">
+                                <Target className="w-2.5 h-2.5" />
+                                {item.smartGoalTitle}
+                              </span>
+                            )}
                             {item.description && (
                               <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
                             )}
                           </div>
-                        </div>
+                          <ArrowRight className="w-4 h-4 text-slate-300 flex-shrink-0 mt-1" />
+                        </button>
                       ))}
                     </div>
                   ) : (
@@ -687,6 +699,54 @@ export function StudentDashboardPage() {
         coachId={defaultCoachId}
         coachOptions={coachOptions}
       />
+
+      {/* Action Item Detail Dialog */}
+      <Dialog open={!!selectedItem} onOpenChange={(v) => { if (!v) setSelectedItem(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#121c34] font-serif text-xl flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-[#607b7d]" />
+              Action Item
+            </DialogTitle>
+            {selectedItem?.smartGoalTitle && (
+              <div className="flex items-center gap-1.5 text-xs text-[#3131d8] font-medium mt-1">
+                <Target className="w-3.5 h-3.5" />
+                Linked to: {selectedItem.smartGoalTitle}
+              </div>
+            )}
+          </DialogHeader>
+          {selectedItem && (
+            <div className="space-y-4 pt-1">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Task</p>
+                <p className="text-base font-semibold text-[#121c34]">{selectedItem.title}</p>
+              </div>
+              {selectedItem.description && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Description</p>
+                  <p className="text-sm text-[#121c34] whitespace-pre-wrap">{selectedItem.description}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Assigned</p>
+                <p className="text-sm text-muted-foreground">
+                  {format(new Date(selectedItem.createdAt), "MMMM d, yyyy")}
+                </p>
+              </div>
+              <div className="pt-2 flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedItem(null)}
+                  className="border-[#121c34]/20 text-[#121c34]"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

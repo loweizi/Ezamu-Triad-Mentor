@@ -252,6 +252,9 @@ export const DeleteAppointmentParams = zod.object({
 export const GetActionItemsResponseItem = zod.object({
   id: zod.number(),
   studentId: zod.number(),
+  coachId: zod.number().nullish(),
+  smartGoalId: zod.number().nullish(),
+  smartGoalTitle: zod.string().nullish(),
   title: zod.string(),
   description: zod.string().nullish(),
   completed: zod.boolean(),
@@ -266,6 +269,7 @@ export const CreateActionItemBody = zod.object({
   studentId: zod.number(),
   title: zod.string(),
   description: zod.string().nullish(),
+  smartGoalId: zod.number().nullish(),
 });
 
 /**
@@ -284,6 +288,9 @@ export const UpdateActionItemBody = zod.object({
 export const UpdateActionItemResponse = zod.object({
   id: zod.number(),
   studentId: zod.number(),
+  coachId: zod.number().nullish(),
+  smartGoalId: zod.number().nullish(),
+  smartGoalTitle: zod.string().nullish(),
   title: zod.string(),
   description: zod.string().nullish(),
   completed: zod.boolean(),

@@ -139,6 +139,12 @@ export interface UpdateAppointmentBody {
 export interface ActionItem {
   id: number;
   studentId: number;
+  /** @nullable */
+  coachId?: number | null;
+  /** @nullable */
+  smartGoalId?: number | null;
+  /** @nullable */
+  smartGoalTitle?: string | null;
   title: string;
   /** @nullable */
   description?: string | null;
@@ -149,6 +155,8 @@ export interface ActionItem {
 export interface CreateActionItemBody {
   studentId: number;
   title: string;
+  /** @nullable */
+  smartGoalId?: number | null;
   /** @nullable */
   description?: string | null;
 }

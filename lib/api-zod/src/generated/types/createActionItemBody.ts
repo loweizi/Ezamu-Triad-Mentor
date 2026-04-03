@@ -10,5 +10,7 @@ export interface CreateActionItemBody {
   studentId: number;
   title: string;
   /** @nullable */
+  smartGoalId?: number | null;
+  /** @nullable */
   description?: string | null;
 }

@@ -5,6 +5,8 @@ import { z } from "zod/v4";
 export const actionItemsTable = pgTable("action_items", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull(),
+  coachId: integer("coach_id"),
+  smartGoalId: integer("smart_goal_id"),
   title: text("title").notNull(),
   description: text("description"),
   completed: boolean("completed").notNull().default(false),

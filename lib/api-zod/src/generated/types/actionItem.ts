@@ -9,6 +9,12 @@
 export interface ActionItem {
   id: number;
   studentId: number;
+  /** @nullable */
+  coachId?: number | null;
+  /** @nullable */
+  smartGoalId?: number | null;
+  /** @nullable */
+  smartGoalTitle?: string | null;
   title: string;
   /** @nullable */
   description?: string | null;
