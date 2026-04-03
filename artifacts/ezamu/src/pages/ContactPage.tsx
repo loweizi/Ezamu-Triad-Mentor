@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mail, MessageSquare, MapPin, Send } from "lucide-react";
+import { Mail, Phone, MapPin, Send } from "lucide-react";
 import { toast } from "sonner";
 
 export function ContactPage() {
@@ -17,60 +17,61 @@ export function ContactPage() {
   return (
     <MainLayout>
       {/* Header */}
-      <div className="bg-[#121c34] text-white py-20 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2071&auto=format&fit=crop')] bg-cover bg-center opacity-10 mix-blend-luminosity"></div>
-        <div className="container mx-auto px-4 relative z-10 text-center max-w-2xl">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4">Get in Touch</h1>
+      <div
+        className="text-white py-20 relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg, #121c34 0%, #3131d8 100%)" }}
+      >
+        <div className="container mx-auto px-6 relative z-10 max-w-2xl">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Contact Us</h1>
           <p className="text-lg text-white/80">
-            Have questions about Ezamu or want to learn how to bring our triad mentorship model to your school? We're here to help.
+            Want to get in touch with Ezamu's team? Contact us through one of the methods below.
           </p>
         </div>
       </div>
 
       <div className="flex-1 bg-slate-50 py-16">
-        <div className="container mx-auto max-w-5xl px-4">
+        <div className="container mx-auto max-w-5xl px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            {/* Contact Info */}
-            <div className="space-y-8">
-              <div>
-                <h2 className="text-2xl font-serif font-bold text-[#121c34] mb-6">Reach out to our team</h2>
-                <p className="text-muted-foreground mb-8">
-                  Whether you're a student looking for guidance, a coach wanting to give back, or an administrator interested in partnerships, we'd love to hear from you.
-                </p>
+            {/* Contact Info Cards */}
+            <div className="space-y-5">
+              {/* Address */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex items-start gap-4">
+                <div className="w-11 h-11 rounded-full bg-[#3131d8]/10 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-[#3131d8]" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-[#121c34] mb-1">Address:</h3>
+                  <p className="text-slate-600 text-sm leading-relaxed">
+                    ScareLQ Corporation<br />
+                    1968 South Coast Hwy #2504 Laguna Beach, CA 92651
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-[#acedff]/20 flex items-center justify-center flex-shrink-0 text-[#121c34]">
-                    <Mail className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-[#121c34]">Email Us</h3>
-                    <p className="text-muted-foreground mb-1">For general inquiries and support.</p>
-                    <a href="mailto:hello@ezamu.com" className="text-[#3131d8] font-medium hover:underline">hello@ezamu.com</a>
-                  </div>
+              {/* Phone Number */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex items-start gap-4">
+                <div className="w-11 h-11 rounded-full bg-[#3131d8]/10 flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-5 h-5 text-[#3131d8]" />
                 </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-[#dbb68f]/20 flex items-center justify-center flex-shrink-0 text-[#bb7e5d]">
-                    <MessageSquare className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-[#121c34]">Partnerships</h3>
-                    <p className="text-muted-foreground mb-1">Interested in bringing Ezamu to your school?</p>
-                    <a href="mailto:partners@ezamu.com" className="text-[#3131d8] font-medium hover:underline">partners@ezamu.com</a>
-                  </div>
+                <div>
+                  <h3 className="font-bold text-[#121c34] mb-1">Phone Number:</h3>
+                  <p className="text-slate-600 text-sm">
+                    (M) +1 (213) 340-4505<br />
+                    (O) +1 (213) 340-4505
+                  </p>
                 </div>
+              </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-[#607b7d]/20 flex items-center justify-center flex-shrink-0 text-[#607b7d]">
-                    <MapPin className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-[#121c34]">Office</h3>
-                    <p className="text-muted-foreground mb-1">Our headquarters.</p>
-                    <p className="text-[#121c34] font-medium">San Francisco, CA</p>
-                  </div>
+              {/* Email */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex items-start gap-4">
+                <div className="w-11 h-11 rounded-full bg-[#3131d8]/10 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-5 h-5 text-[#3131d8]" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-[#121c34] mb-1">Email:</h3>
+                  <a href="mailto:mk@ezamu.com" className="text-[#3131d8] text-sm font-medium hover:underline">
+                    mk@ezamu.com
+                  </a>
                 </div>
               </div>
             </div>
@@ -91,28 +92,28 @@ export function ContactPage() {
                         <Input id="lastName" placeholder="Doe" required />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="email">Email Address</Label>
                       <Input id="email" type="email" placeholder="jane@example.com" required />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="subject">Subject</Label>
                       <Input id="subject" placeholder="How can we help?" required />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="message">Message</Label>
-                      <Textarea 
-                        id="message" 
-                        placeholder="Tell us what's on your mind..." 
-                        className="min-h-[150px] resize-none"
+                      <Textarea
+                        id="message"
+                        placeholder="Tell us what's on your mind..."
+                        className="min-h-[140px] resize-none"
                         required
                       />
                     </div>
-                    
-                    <Button type="submit" className="w-full bg-[#121c34] hover:bg-[#121c34]/90 h-12 text-md">
+
+                    <Button type="submit" className="w-full bg-[#3131d8] hover:bg-[#3131d8]/90 h-12 text-base">
                       Send Message
                       <Send className="w-4 h-4 ml-2" />
                     </Button>
