@@ -113,7 +113,7 @@ export function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className={`h-8 w-8 ring-2 ${isHome ? "ring-[#121c34]/20" : "ring-white/20"}`}>
-                      <AvatarImage src={user?.imageUrl} alt={user?.fullName || "User"} />
+                      <AvatarImage src={appUser?.profilePicUrl ?? user?.imageUrl ?? undefined} alt={user?.fullName || "User"} />
                       <AvatarFallback className="bg-[#607b7d] text-white">
                         {user?.firstName?.charAt(0) || <UserIcon className="h-4 w-4" />}
                       </AvatarFallback>
@@ -172,7 +172,7 @@ export function Navbar() {
                 <Show when="signed-in">
                   <div className="flex items-center gap-3 mb-4">
                     <Avatar className="h-10 w-10 ring-2 ring-white/20">
-                      <AvatarImage src={user?.imageUrl} alt={user?.fullName || "User"} />
+                      <AvatarImage src={appUser?.profilePicUrl ?? user?.imageUrl ?? undefined} alt={user?.fullName || "User"} />
                       <AvatarFallback className="bg-[#607b7d] text-white">
                         {user?.firstName?.charAt(0) || <UserIcon className="h-5 w-5" />}
                       </AvatarFallback>
