@@ -14,9 +14,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, type SmartGoal, type ActionItem } from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, useUpdateActionItem, getGetActionItemsQueryKey, getGetDashboardSummaryQueryKey, type SmartGoal, type ActionItem } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2, Plus, Target, Clock, CheckCheck, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2, Plus, Target, Clock, CheckCheck, XCircle, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { format, formatDistanceToNow, isPast, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -296,14 +297,32 @@ function NewGoalDialog({
 
 export function StudentDashboardPage() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: user } = useGetMe();
   const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary();
   const { data: actionItems, isLoading: isItemsLoading } = useGetActionItems();
   const { data: appointments, isLoading: isAppointmentsLoading } = useGetAppointments();
   const { data: smartGoals = [], isLoading: isGoalsLoading } = useGetSmartGoals();
+  const updateActionItem = useUpdateActionItem();
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
   const [goalsFilter, setGoalsFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
   const [selectedItem, setSelectedItem] = useState<ActionItem | null>(null);
+  const [completingId, setCompletingId] = useState<number | null>(null);
+
+  const handleMarkComplete = async (itemId: number) => {
+    setCompletingId(itemId);
+    try {
+      await updateActionItem.mutateAsync({ itemId, data: { completed: true } });
+      queryClient.invalidateQueries({ queryKey: getGetActionItemsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+      setSelectedItem(null);
+      toast({ title: "Task completed!", description: "Great work — keep it up." });
+    } catch {
+      toast({ title: "Error", description: "Failed to mark item as complete.", variant: "destructive" });
+    } finally {
+      setCompletingId(null);
+    }
+  };
 
   const isLoading = isSummaryLoading || isItemsLoading || isAppointmentsLoading;
 
@@ -340,6 +359,7 @@ export function StudentDashboardPage() {
   }
 
   const pendingItems = actionItems?.filter(i => !i.completed) || [];
+  const completedItems = actionItems?.filter(i => i.completed) || [];
   const upcomingAppointments = appointments?.filter(a => new Date(a.scheduledAt) > new Date()).slice(0, 3) || [];
 
   const goalCounts = {
@@ -448,25 +468,45 @@ export function StudentDashboardPage() {
                 <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between pb-4">
                   <div>
                     <CardTitle className="text-xl font-serif text-[#121c34]">Your Action Plan</CardTitle>
-                    <CardDescription>Tasks to complete before your next session</CardDescription>
+                    <CardDescription>Tasks assigned by your coach</CardDescription>
                   </div>
                   <Badge variant="outline" className="bg-[#121c34]/5 text-[#121c34] border-[#121c34]/20">
-                    {pendingItems.length} pending
+                    {completedItems.length}/{(actionItems?.length || 0)} done
                   </Badge>
                 </CardHeader>
                 <CardContent className="p-0">
-                  {pendingItems.length > 0 ? (
+                  {(actionItems?.length || 0) === 0 ? (
+                    <div className="p-8 text-center flex flex-col items-center">
+                      <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-400">
+                        <CheckCircle2 className="w-6 h-6" />
+                      </div>
+                      <p className="text-[#121c34] font-medium">No tasks yet</p>
+                      <p className="text-sm text-muted-foreground mt-1">Your coach will assign action items here.</p>
+                    </div>
+                  ) : (
                     <div className="divide-y">
+                      {/* Pending items */}
                       {pendingItems.map(item => (
-                        <button
+                        <div
                           key={item.id}
-                          onClick={() => setSelectedItem(item)}
-                          className="w-full p-4 flex items-start gap-4 hover:bg-slate-50 transition-colors text-left"
+                          className="p-4 flex items-start gap-3 hover:bg-slate-50 transition-colors"
                         >
-                          <span className="mt-1 flex-shrink-0 text-slate-300">
-                            <CheckCircle2 className="w-5 h-5" />
-                          </span>
-                          <div className="flex-1 min-w-0">
+                          {/* Checkbox button */}
+                          <button
+                            onClick={() => handleMarkComplete(item.id)}
+                            disabled={completingId === item.id}
+                            className="mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 border-slate-300 hover:border-[#3131d8] transition-colors flex items-center justify-center disabled:opacity-50"
+                            title="Mark as complete"
+                          >
+                            {completingId === item.id && (
+                              <Loader2 className="w-3 h-3 animate-spin text-[#3131d8]" />
+                            )}
+                          </button>
+                          {/* Content — click opens detail dialog */}
+                          <button
+                            onClick={() => setSelectedItem(item)}
+                            className="flex-1 min-w-0 text-left"
+                          >
                             <p className="font-medium text-[#121c34] truncate">{item.title}</p>
                             {item.smartGoalTitle && (
                               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#3131d8] bg-[#3131d8]/8 rounded px-1.5 py-0.5 mt-1">
@@ -475,20 +515,46 @@ export function StudentDashboardPage() {
                               </span>
                             )}
                             {item.description && (
-                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{item.description}</p>
                             )}
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-slate-300 flex-shrink-0 mt-1" />
-                        </button>
+                          </button>
+                          <ArrowRight className="w-4 h-4 text-slate-300 flex-shrink-0 mt-1 cursor-pointer" onClick={() => setSelectedItem(item)} />
+                        </div>
                       ))}
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center flex flex-col items-center">
-                      <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-400">
-                        <CheckCircle2 className="w-6 h-6" />
-                      </div>
-                      <p className="text-[#121c34] font-medium">All caught up!</p>
-                      <p className="text-sm text-muted-foreground mt-1">You have no pending action items.</p>
+
+                      {/* Completed items */}
+                      {completedItems.length > 0 && (
+                        <>
+                          {pendingItems.length > 0 && (
+                            <div className="px-4 py-2 bg-slate-50 border-y">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Completed</p>
+                            </div>
+                          )}
+                          {completedItems.map(item => (
+                            <div key={item.id} className="p-4 flex items-start gap-3 opacity-60">
+                              <div className="mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 border-green-500 bg-green-500 flex items-center justify-center">
+                                <Check className="w-3 h-3 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-[#121c34] line-through truncate">{item.title}</p>
+                                {item.smartGoalTitle && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#3131d8] bg-[#3131d8]/8 rounded px-1.5 py-0.5 mt-1">
+                                    <Target className="w-2.5 h-2.5" />
+                                    {item.smartGoalTitle}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* All done state */}
+                      {pendingItems.length === 0 && completedItems.length > 0 && (
+                        <div className="p-6 text-center">
+                          <p className="text-sm font-medium text-green-600">🎉 All tasks completed!</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -659,32 +725,59 @@ export function StudentDashboardPage() {
                 </Card>
               )}
 
-              {/* Goal Summary Card */}
+              {/* Goal Progress Card — per SMART Goal */}
               {smartGoals.length > 0 && (
                 <Card className="shadow-sm border-none">
                   <CardHeader className="pb-3 border-b">
-                    <CardTitle className="text-base font-serif text-[#121c34]">Goal Progress</CardTitle>
+                    <CardTitle className="text-base font-serif text-[#121c34] flex items-center gap-2">
+                      <Target className="w-4 h-4 text-[#3131d8]" />
+                      Goal Progress
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-4 space-y-3">
-                    {[
-                      { status: "approved", label: "Approved", color: "bg-green-500" },
-                      { status: "pending", label: "Awaiting Review", color: "bg-amber-400" },
-                      { status: "denied", label: "Needs Revision", color: "bg-red-400" },
-                    ].map(({ status, label, color }) => {
-                      const count = goalCounts[status as keyof typeof goalCounts];
-                      const pct = smartGoals.length > 0 ? Math.round((count / smartGoals.length) * 100) : 0;
-                      return (
-                        <div key={status}>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-muted-foreground">{label}</span>
-                            <span className="font-semibold text-[#121c34]">{count}</span>
+                  <CardContent className="pt-4 space-y-4">
+                    {smartGoals
+                      .sort((a, b) => {
+                        const order = { approved: 0, pending: 1, denied: 2 };
+                        return order[a.status] - order[b.status];
+                      })
+                      .map(goal => {
+                        const linked = (actionItems || []).filter(i => i.smartGoalId === goal.id);
+                        const done = linked.filter(i => i.completed).length;
+                        const total = linked.length;
+                        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                        const barColor =
+                          goal.status === "approved" ? "bg-[#3131d8]"
+                          : goal.status === "denied" ? "bg-red-400"
+                          : "bg-amber-400";
+                        const statusBadge =
+                          goal.status === "approved" ? "text-green-700 bg-green-50 border-green-200"
+                          : goal.status === "denied" ? "text-red-700 bg-red-50 border-red-200"
+                          : "text-amber-700 bg-amber-50 border-amber-200";
+
+                        return (
+                          <div key={goal.id}>
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <p className="text-xs font-semibold text-[#121c34] leading-snug flex-1 min-w-0 truncate" title={goal.title}>
+                                {goal.title}
+                              </p>
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border flex-shrink-0 capitalize ${statusBadge}`}>
+                                {goal.status}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${barColor} rounded-full transition-all duration-500`}
+                                  style={{ width: total > 0 ? `${pct}%` : "0%" }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground flex-shrink-0 w-12 text-right">
+                                {total > 0 ? `${done}/${total}` : "No tasks"}
+                              </span>
+                            </div>
                           </div>
-                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </CardContent>
                 </Card>
               )}
@@ -733,7 +826,7 @@ export function StudentDashboardPage() {
                   {format(new Date(selectedItem.createdAt), "MMMM d, yyyy")}
                 </p>
               </div>
-              <div className="pt-2 flex justify-end">
+              <div className="pt-2 flex items-center justify-between gap-3 border-t">
                 <Button
                   variant="outline"
                   size="sm"
@@ -742,6 +835,27 @@ export function StudentDashboardPage() {
                 >
                   Close
                 </Button>
+                {!selectedItem.completed && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleMarkComplete(selectedItem.id)}
+                    disabled={completingId === selectedItem.id}
+                    className="bg-[#3131d8] hover:bg-[#3131d8]/90 text-white border-none"
+                  >
+                    {completingId === selectedItem.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Check className="w-4 h-4 mr-2" />
+                    )}
+                    Mark as Complete
+                  </Button>
+                )}
+                {selectedItem.completed && (
+                  <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+                    <CheckCheck className="w-4 h-4" />
+                    Completed
+                  </span>
+                )}
               </div>
             </div>
           )}
