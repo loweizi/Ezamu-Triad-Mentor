@@ -103,7 +103,7 @@ export function CoachProfilePage() {
           </div>
         </div>
 
-        <div className="container mx-auto max-w-4xl px-4 -mt-16 pb-12">
+        <div className="container mx-auto max-w-4xl px-4 -mt-16 pb-12 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Main Profile Info */}
             <div className="md:col-span-2 space-y-6">
