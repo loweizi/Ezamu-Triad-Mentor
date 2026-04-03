@@ -17,6 +17,7 @@ import {
   getGetConversationsQueryKey,
   getGetMessagesQueryKey,
 } from "@workspace/api-client-react";
+import type { UserSummary } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { Send, User as UserIcon, Loader2, MessageSquare, PenSquare, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,6 +33,8 @@ export function ChatPage() {
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [searchEmail, setSearchEmail] = useState("");
   const debouncedEmail = useDebounce(searchEmail, 300);
+  // Holds the user picked from search until they appear in the conversations list
+  const [newChatTarget, setNewChatTarget] = useState<UserSummary | null>(null);
 
   const { data: conversations, isLoading: isConvLoading } = useGetConversations();
 
@@ -77,15 +80,30 @@ export function ChatPage() {
     });
   };
 
-  const handleStartChat = (userId: number) => {
-    setActiveUserId(userId);
+  const handleStartChat = (user: UserSummary) => {
+    setActiveUserId(user.id);
+    setNewChatTarget(user);
     setNewChatOpen(false);
     setSearchEmail("");
-    // Refresh conversations so the new contact appears in the sidebar
     queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
   };
 
-  const activeUser = conversations?.find(c => c.userId === activeUserId);
+  // Use the conversation entry if it exists, otherwise fall back to the
+  // user picked from search (for brand-new chats that have no messages yet)
+  const conversationEntry = conversations?.find(c => c.userId === activeUserId);
+  const activeUser = conversationEntry ?? (
+    newChatTarget && newChatTarget.id === activeUserId
+      ? {
+          userId: newChatTarget.id,
+          firstName: newChatTarget.firstName,
+          lastName: newChatTarget.lastName,
+          profilePicUrl: newChatTarget.profilePicUrl ?? null,
+          lastMessage: "",
+          lastMessageAt: new Date().toISOString(),
+          unreadCount: 0,
+        }
+      : undefined
+  );
 
   return (
     <MainLayout>
@@ -285,7 +303,7 @@ export function ChatPage() {
                   {searchResults?.map(user => (
                     <button
                       key={user.id}
-                      onClick={() => handleStartChat(user.id)}
+                      onClick={() => handleStartChat(user)}
                       className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors text-left"
                     >
                       <Avatar className="h-10 w-10 border border-slate-100">
