@@ -95,7 +95,7 @@ export function CoachProfilePage() {
     <MainLayout>
       <div className="flex-1 bg-slate-50">
         {/* Profile Header */}
-        <div className="bg-[#121c34] pt-8 pb-32 px-4 relative">
+        <div className="bg-[#121c34] pt-8 pb-16 px-4 relative">
           <div className="container mx-auto max-w-4xl">
             <Link href="/appointments" className="inline-flex items-center text-white/70 hover:text-white mb-6 text-sm font-medium transition-colors">
               <ChevronLeft className="w-4 h-4 mr-1" /> Back to all coaches
@@ -103,7 +103,7 @@ export function CoachProfilePage() {
           </div>
         </div>
 
-        <div className="container mx-auto max-w-4xl px-4 -mt-24 pb-12">
+        <div className="container mx-auto max-w-4xl px-4 -mt-10 pb-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Main Profile Info */}
             <div className="md:col-span-2 space-y-6">

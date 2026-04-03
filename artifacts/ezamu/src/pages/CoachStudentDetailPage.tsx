@@ -265,7 +265,7 @@ export function CoachStudentDetailPage() {
     <MainLayout>
       <div className="flex-1 bg-slate-50 pb-12">
         {/* Header */}
-        <div className="bg-[#121c34] text-white pt-8 pb-20 px-4">
+        <div className="bg-[#121c34] text-white pt-8 pb-10 px-4">
           <div className="container mx-auto max-w-5xl">
             <Link href="/dashboard">
               <button className="flex items-center gap-2 text-white/60 hover:text-white text-sm mb-6 transition-colors">
