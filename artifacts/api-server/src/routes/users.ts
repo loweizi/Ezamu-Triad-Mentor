@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or } from "drizzle-orm";
+import { eq, ilike } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import {
   GetMeResponse,
@@ -10,43 +10,51 @@ import {
   SearchUsersQueryParams,
   SearchUsersResponseItem,
 } from "@workspace/api-zod";
-import { getAuth } from "@clerk/express";
+import { clerkClient } from "@clerk/express";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
 
-async function getOrCreateUser(clerkId: string, fallbackData?: { email?: string; firstName?: string; lastName?: string }): Promise<typeof usersTable.$inferSelect | null> {
+async function fetchClerkUser(clerkId: string): Promise<{ email: string; firstName: string; lastName: string } | null> {
+  try {
+    const clerkUser = await clerkClient.users.getUser(clerkId);
+    const email = clerkUser.emailAddresses?.[0]?.emailAddress ?? "";
+    const firstName = clerkUser.firstName ?? "";
+    const lastName = clerkUser.lastName ?? "";
+    return { email, firstName, lastName };
+  } catch {
+    return null;
+  }
+}
+
+async function getOrCreateUser(clerkId: string): Promise<typeof usersTable.$inferSelect | null> {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
   if (user) return user;
 
-  // Auto-create user record if it doesn't exist yet (webhook may not have fired)
-  if (fallbackData?.email) {
-    const [created] = await db.insert(usersTable).values({
-      clerkId,
-      email: fallbackData.email,
-      firstName: fallbackData.firstName ?? "",
-      lastName: fallbackData.lastName ?? "",
-      role: "student",
-      fieldsOfInterest: [],
-      fieldsOfExpertise: [],
-      onboardingCompleted: false,
-    }).onConflictDoNothing().returning();
-    if (created) return created;
-    const [refetch] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
-    return refetch ?? null;
-  }
-  return null;
+  // User doesn't exist yet — fetch their info from Clerk and auto-create
+  const clerkData = await fetchClerkUser(clerkId);
+  if (!clerkData?.email) return null;
+
+  const [created] = await db.insert(usersTable).values({
+    clerkId,
+    email: clerkData.email,
+    firstName: clerkData.firstName,
+    lastName: clerkData.lastName,
+    role: "student",
+    fieldsOfInterest: [],
+    fieldsOfExpertise: [],
+    onboardingCompleted: false,
+  }).onConflictDoNothing().returning();
+
+  if (created) return created;
+
+  const [refetch] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
+  return refetch ?? null;
 }
 
 router.get("/users/me", requireAuth, async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
-  const auth = getAuth(req);
-  const sessionClaims = auth?.sessionClaims as any;
-  const user = await getOrCreateUser(clerkId, {
-    email: sessionClaims?.email ?? undefined,
-    firstName: sessionClaims?.firstName ?? sessionClaims?.given_name ?? undefined,
-    lastName: sessionClaims?.lastName ?? sessionClaims?.family_name ?? undefined,
-  });
+  const user = await getOrCreateUser(clerkId);
   if (!user) {
     res.status(404).json({ error: "User not found. Complete sign-up first." });
     return;
