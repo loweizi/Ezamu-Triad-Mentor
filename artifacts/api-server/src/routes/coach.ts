@@ -75,7 +75,7 @@ router.get("/coach/students/:studentId", requireAuth, async (req, res): Promise<
   ).then(appts => appts.filter(a => a.studentId === studentId));
 
   const assessmentResult = await db.select().from(assessmentResultsTable)
-    .where(eq(assessmentResultsTable.userId, studentId))
+    .where(eq(assessmentResultsTable.studentId, studentId))
     .then(rows => rows[0] ?? null);
 
   const now = new Date();
@@ -97,8 +97,8 @@ router.get("/coach/students/:studentId", requireAuth, async (req, res): Promise<
     totalAppointments: appointments.length,
     nextAppointmentAt: upcoming ? upcoming.scheduledAt.toISOString() : null,
     assessmentResult: assessmentResult ? {
-      archetype: assessmentResult.archetype,
-      completedAt: assessmentResult.completedAt?.toISOString() ?? null,
+      archetype: assessmentResult.innerHeroType,
+      completedAt: assessmentResult.dateTaken?.toISOString() ?? null,
     } : null,
     appointments: appointments
       .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
