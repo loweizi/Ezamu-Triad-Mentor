@@ -155,17 +155,13 @@ export function OnboardingPage() {
                     onClick={() => handleInterestToggle(interest)}
                   >
                     <Checkbox 
-                      id={`interest-${interest}`} 
                       checked={selectedInterests.includes(interest)}
-                      onCheckedChange={() => handleInterestToggle(interest)}
-                      className="data-[state=checked]:bg-[#3131d8] data-[state=checked]:border-[#3131d8]"
+                      onCheckedChange={() => {}}
+                      className="data-[state=checked]:bg-[#3131d8] data-[state=checked]:border-[#3131d8] pointer-events-none"
                     />
-                    <Label 
-                      htmlFor={`interest-${interest}`}
-                      className="cursor-pointer flex-1 font-medium"
-                    >
+                    <span className="flex-1 font-medium text-sm">
                       {interest}
-                    </Label>
+                    </span>
                   </div>
                 ))}
               </div>

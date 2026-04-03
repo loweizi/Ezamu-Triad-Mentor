@@ -20,7 +20,7 @@ const ALL_FIELDS = [
 
 export function ProfilePage() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
+  const { data: user, isLoading } = useGetMe();
   const updateMe = useUpdateMe();
 
   const [firstName, setFirstName] = useState("");
@@ -188,15 +188,12 @@ export function ProfilePage() {
                             <Checkbox 
                               id={`field-${field}`} 
                               checked={fields.includes(field)}
-                              onCheckedChange={() => handleFieldToggle(field)}
-                              className="data-[state=checked]:bg-[#3131d8] data-[state=checked]:border-[#3131d8]"
+                              onCheckedChange={() => {}}
+                              className="data-[state=checked]:bg-[#3131d8] data-[state=checked]:border-[#3131d8] pointer-events-none"
                             />
-                            <Label 
-                              htmlFor={`field-${field}`}
-                              className="cursor-pointer flex-1 font-medium"
-                            >
+                            <span className="flex-1 font-medium text-sm">
                               {field}
-                            </Label>
+                            </span>
                           </div>
                         ))}
                       </div>
