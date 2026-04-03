@@ -25,6 +25,7 @@ export function OnboardingPage() {
   const [age, setAge] = useState<string>("");
   const [bio, setBio] = useState("");
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const pendingRole = localStorage.getItem("ezamu_pending_role") as "student" | "coach" | "guardian" | null;
 
   useEffect(() => {
     if (user?.onboardingCompleted) {
@@ -67,11 +68,13 @@ export function OnboardingPage() {
         data: { 
           age: Number(age),
           bio,
+          ...(pendingRole ? { role: pendingRole } : {}),
           fieldsOfInterest: selectedInterests
         } 
       },
       {
         onSuccess: () => {
+          localStorage.removeItem("ezamu_pending_role");
           toast.success("Welcome to Ezamu!");
           setLocation("/dashboard");
         },

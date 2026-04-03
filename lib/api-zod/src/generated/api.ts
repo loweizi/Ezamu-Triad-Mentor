@@ -76,6 +76,7 @@ export const UpdateMeResponse = zod.object({
 export const OnboardUserBody = zod.object({
   age: zod.number().optional(),
   bio: zod.string(),
+  role: zod.enum(["student", "coach", "guardian"]).optional(),
   fieldsOfInterest: zod.array(zod.string()).optional(),
   fieldsOfExpertise: zod.array(zod.string()).optional(),
 });

@@ -39,9 +39,6 @@ export function Navbar() {
     <nav className={navClass}>
       <div className="container mx-auto px-4 h-[72px] flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#3131d8] to-[#acedff] flex items-center justify-center text-white font-bold text-xl">
-            E
-          </div>
           <span className={`font-sans text-2xl font-bold tracking-tight ${logoTextClass}`}>Ezamu</span>
         </Link>
 

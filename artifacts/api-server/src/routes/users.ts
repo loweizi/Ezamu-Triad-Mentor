@@ -97,6 +97,7 @@ router.post("/users/onboard", requireAuth, async (req, res): Promise<void> => {
     onboardingCompleted: true,
   };
   if (parsed.data.age != null) updates.age = parsed.data.age;
+  if (parsed.data.role) updates.role = parsed.data.role;
   if (parsed.data.fieldsOfInterest) updates.fieldsOfInterest = parsed.data.fieldsOfInterest;
   if (parsed.data.fieldsOfExpertise) updates.fieldsOfExpertise = parsed.data.fieldsOfExpertise;
   const [updated] = await db

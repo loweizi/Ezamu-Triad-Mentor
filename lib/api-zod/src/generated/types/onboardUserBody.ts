@@ -9,6 +9,7 @@
 export interface OnboardUserBody {
   age?: number;
   bio: string;
+  role?: "student" | "coach" | "guardian";
   fieldsOfInterest?: string[];
   fieldsOfExpertise?: string[];
 }
