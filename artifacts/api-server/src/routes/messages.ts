@@ -73,6 +73,30 @@ router.post("/messages", requireAuth, async (req, res): Promise<void> => {
   }));
 });
 
+router.patch("/messages/read", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const { withUserId } = req.body as { withUserId?: number };
+  if (!withUserId || typeof withUserId !== "number") {
+    res.status(400).json({ error: "withUserId required" });
+    return;
+  }
+  await db.update(messagesTable)
+    .set({ read: true })
+    .where(
+      and(
+        eq(messagesTable.senderId, withUserId),
+        eq(messagesTable.receiverId, user.id),
+        eq(messagesTable.read, false)
+      )
+    );
+  res.sendStatus(204);
+});
+
 router.get("/messages/conversations", requireAuth, async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));

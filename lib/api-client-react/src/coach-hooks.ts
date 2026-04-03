@@ -137,3 +137,18 @@ export function useSaveCoachNote() {
     },
   });
 }
+
+export function useMarkMessagesRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (withUserId: number) =>
+      customFetch<void>("/api/messages/read", {
+        method: "PATCH",
+        body: JSON.stringify({ withUserId }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
+    },
+  });
+}

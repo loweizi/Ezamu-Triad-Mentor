@@ -14,6 +14,7 @@ import {
   useGetMessages,
   useSendMessage,
   useSearchUsers,
+  useMarkMessagesRead,
   getGetConversationsQueryKey,
   getGetMessagesQueryKey,
 } from "@workspace/api-client-react";
@@ -49,6 +50,7 @@ export function ChatPage() {
   );
 
   const sendMessage = useSendMessage();
+  const markRead = useMarkMessagesRead();
 
   // Set initial active user if conversations exist
   useEffect(() => {
@@ -56,6 +58,14 @@ export function ChatPage() {
       setActiveUserId(conversations[0].userId);
     }
   }, [conversations, activeUserId]);
+
+  // Mark messages as read whenever a conversation is opened
+  useEffect(() => {
+    if (activeUserId) {
+      markRead.mutate(activeUserId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUserId]);
 
   // Scroll to bottom when messages change
   useEffect(() => {

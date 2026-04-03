@@ -215,10 +215,12 @@ export function CoachStudentDetailPage() {
     }
     try {
       await createActionItem.mutateAsync({
-        studentId,
-        title: newItemTitle.trim(),
-        description: newItemDescription.trim() || null,
-        smartGoalId: newItemGoalId ?? null,
+        data: {
+          studentId,
+          title: newItemTitle.trim(),
+          description: newItemDescription.trim() || undefined,
+          smartGoalId: newItemGoalId ?? undefined,
+        },
       });
       setNewItemTitle("");
       setNewItemDescription("");
