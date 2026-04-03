@@ -72,11 +72,8 @@ export function AssessmentPage() {
   };
 
   const handleSingleSelect = (optionIndex: number) => {
-    if (advanceTimeoutRef.current) {
-      clearTimeout(advanceTimeoutRef.current);
-      advanceTimeoutRef.current = null;
-    }
     setAnswers(prev => ({ ...prev, [question.id]: [optionIndex] }));
+    advanceTimeoutRef.current = setTimeout(() => advanceStep(), 400);
   };
 
   const handleMultiSelect = (optionIndex: number) => {
@@ -270,12 +267,23 @@ export function AssessmentPage() {
     <MainLayout>
       <div className="flex-1 flex flex-col bg-white">
         {/* Progress header */}
-        <div className="sticky top-0 z-10 bg-white border-b px-4 pt-4 pb-3">
+        <div className="sticky top-0 z-10 bg-white border-b p-4">
           <div className="container mx-auto max-w-3xl flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-muted-foreground">
-              Question {currentStep + 1} of {QUESTIONS.length}
-            </span>
-            <span className="text-sm font-bold text-[#3131d8]">{Math.round(progress)}%</span>
+            <div className="flex items-center gap-3">
+              {currentStep > 0 && (
+                <button
+                  onClick={goBack}
+                  className="flex items-center gap-1.5 text-sm font-medium text-[#121c34]/60 hover:text-[#121c34] transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Back
+                </button>
+              )}
+              <span className="text-sm font-medium text-muted-foreground">
+                Question {currentStep + 1} of {QUESTIONS.length}
+              </span>
+            </div>
+            <span className="text-sm font-bold text-[#121c34]">{Math.round(progress)}%</span>
           </div>
           <div className="container mx-auto max-w-3xl">
             <Progress value={progress} className="h-2" indicatorClassName="bg-[#3131d8]" />
@@ -294,31 +302,29 @@ export function AssessmentPage() {
 
           <div className="flex-1">
             {question.type === "single" && (
-              <>
-                <div className="space-y-4 mb-8">
-                  {question.options.map((opt, idx) => {
-                    const isSelected = answers[question.id]?.[0] === idx;
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => handleSingleSelect(idx)}
-                        className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 flex items-center gap-4 ${
-                          isSelected
-                            ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.01]"
-                            : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
-                        }`}
-                      >
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                          isSelected ? "border-[#3131d8]" : "border-slate-300"
-                        }`}>
-                          {isSelected && <div className="w-3 h-3 rounded-full bg-[#3131d8]" />}
-                        </div>
-                        <span className="text-lg font-medium text-[#121c34]">{opt.text}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
+              <div className="space-y-4">
+                {question.options.map((opt, idx) => {
+                  const isSelected = answers[question.id]?.[0] === idx;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleSingleSelect(idx)}
+                      className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 flex items-center gap-4 ${
+                        isSelected 
+                          ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.01]" 
+                          : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                        isSelected ? "border-[#3131d8]" : "border-slate-300"
+                      }`}>
+                        {isSelected && <div className="w-3 h-3 rounded-full bg-[#3131d8]" />}
+                      </div>
+                      <span className="text-lg font-medium text-[#121c34]">{opt.text}</span>
+                    </button>
+                  );
+                })}
+              </div>
             )}
 
             {question.type === "card-select" && (
@@ -330,8 +336,8 @@ export function AssessmentPage() {
                       key={idx}
                       onClick={() => handleSingleSelect(idx)}
                       className={`w-full text-left p-8 rounded-3xl border-2 transition-all duration-200 flex flex-col items-center justify-center text-center gap-4 h-48 ${
-                        isSelected
-                          ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.02]"
+                        isSelected 
+                          ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.02]" 
                           : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
                       }`}
                     >
