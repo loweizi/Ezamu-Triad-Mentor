@@ -34,6 +34,19 @@ export function Navbar() {
   const linkClass = isHome
     ? "text-sm font-medium text-[#121c34]/70 hover:text-[#121c34] transition-colors"
     : "text-sm font-medium text-white/80 hover:text-white transition-colors";
+
+  const getNavLinkClass = (href: string, extra = "") => {
+    const isActive = location === href || (href !== "/" && location.startsWith(href));
+    if (isHome) {
+      return `text-sm font-medium transition-colors ${isActive ? "text-[#121c34] font-bold" : "text-[#121c34]/70 hover:text-[#121c34]"} ${extra}`;
+    }
+    return `text-sm font-medium transition-colors ${isActive ? "text-white font-bold" : "text-white/80 hover:text-white"} ${extra}`;
+  };
+
+  const getMobileNavLinkClass = (href: string) => {
+    const isActive = location === href || (href !== "/" && location.startsWith(href));
+    return `text-lg transition-colors ${isActive ? "text-white font-bold" : "font-medium text-white/80 hover:text-white"}`;
+  };
   const loginClass = isHome
     ? "text-sm font-medium text-[#121c34] hover:text-[#3131d8] transition-colors"
     : "text-sm font-medium text-white hover:text-white/80 transition-colors";
@@ -68,21 +81,21 @@ export function Navbar() {
           </Show>
 
           <Show when="signed-in">
-            <Link href="/dashboard" className={linkClass}>
+            <Link href="/dashboard" className={getNavLinkClass("/dashboard")}>
               Dashboard
             </Link>
             {appUser?.role === "coach" ? (
-              <Link href="/availability" className={`${linkClass} flex items-center gap-1.5`}>
+              <Link href="/availability" className={getNavLinkClass("/availability", "flex items-center gap-1.5")}>
                 <CalendarDays className="w-4 h-4" />
                 My Availability
               </Link>
             ) : (
-              <Link href="/assessment" className={`${linkClass} flex items-center gap-1.5`}>
+              <Link href="/assessment" className={getNavLinkClass("/assessment", "flex items-center gap-1.5")}>
                 <Activity className="w-4 h-4" />
                 Assessment
               </Link>
             )}
-            <Link href="/appointments" className={linkClass}>
+            <Link href="/appointments" className={getNavLinkClass("/appointments")}>
               Appointments
             </Link>
 
@@ -170,26 +183,26 @@ export function Navbar() {
                     </div>
                   </div>
 
-                  <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors">
+                  <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/dashboard")}>
                     Dashboard
                   </Link>
                   {appUser?.role === "coach" ? (
-                    <Link href="/availability" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors flex items-center gap-2">
+                    <Link href="/availability" onClick={() => setMobileMenuOpen(false)} className={`${getMobileNavLinkClass("/availability")} flex items-center gap-2`}>
                       <CalendarDays className="w-5 h-5" />
                       My Availability
                     </Link>
                   ) : (
-                    <Link href="/assessment" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors">
+                    <Link href="/assessment" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/assessment")}>
                       Assessment
                     </Link>
                   )}
-                  <Link href="/appointments" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors">
+                  <Link href="/appointments" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/appointments")}>
                     Appointments
                   </Link>
-                  <Link href="/chat" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors">
+                  <Link href="/chat" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/chat")}>
                     Messages
                   </Link>
-                  <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors">
+                  <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/profile")}>
                     Profile
                   </Link>
 
