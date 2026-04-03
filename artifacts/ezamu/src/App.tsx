@@ -14,6 +14,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 import { AssessmentPage } from "@/pages/AssessmentPage";
 import { AppointmentsPage } from "@/pages/AppointmentsPage";
+import { MyAppointmentsPage } from "@/pages/MyAppointmentsPage";
 import { CoachProfilePage } from "@/pages/CoachProfilePage";
 import { ChatPage } from "@/pages/ChatPage";
 import { ProfilePage } from "@/pages/ProfilePage";
@@ -115,6 +116,9 @@ function ClerkProviderWithRoutes() {
             </Route>
             <Route path="/appointments">
               <ProtectedRoute component={AppointmentsPage} />
+            </Route>
+            <Route path="/my-appointments">
+              <ProtectedRoute component={MyAppointmentsPage} />
             </Route>
             <Route path="/coach/:coachId">
               <ProtectedRoute component={CoachProfilePage} />

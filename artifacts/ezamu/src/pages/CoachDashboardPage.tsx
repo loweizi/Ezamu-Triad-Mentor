@@ -106,7 +106,7 @@ export function CoachDashboardPage() {
                     <CardTitle className="text-xl font-serif text-[#121c34]">Upcoming Sessions</CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">Your scheduled appointments</p>
                   </div>
-                  <Link href="/appointments">
+                  <Link href="/my-appointments">
                     <Button variant="outline" size="sm" className="text-[#3131d8] border-[#3131d8]/30 hover:bg-[#3131d8]/5">
                       View all <ArrowRight className="w-3 h-3 ml-1" />
                     </Button>

@@ -641,7 +641,7 @@ export function StudentDashboardPage() {
                         </Button>
                       )}
                       {goalsFilter === "all" && coachOptions.length === 0 && (
-                        <Link href="/appointments">
+                        <Link href="/my-appointments">
                           <Button variant="outline" size="sm" className="mt-4 border-dashed">
                             Book a Session First
                           </Button>
@@ -688,7 +688,7 @@ export function StudentDashboardPage() {
                   ) : (
                     <div className="p-6 text-center">
                       <p className="text-muted-foreground text-sm mb-4">No upcoming sessions scheduled.</p>
-                      <Link href="/appointments">
+                      <Link href="/my-appointments">
                         <Button variant="outline" className="w-full border-dashed">
                           Book a Session
                         </Button>
@@ -697,7 +697,7 @@ export function StudentDashboardPage() {
                   )}
                   {appointments && appointments.length > 3 && (
                     <div className="p-3 border-t bg-slate-50 text-center">
-                      <Link href="/appointments" className="text-sm font-medium text-[#3131d8] hover:underline flex items-center justify-center">
+                      <Link href="/my-appointments" className="text-sm font-medium text-[#3131d8] hover:underline flex items-center justify-center">
                         View all <ArrowRight className="w-4 h-4 ml-1" />
                       </Link>
                     </div>
