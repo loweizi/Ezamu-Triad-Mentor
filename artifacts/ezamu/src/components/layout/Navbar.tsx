@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Show, useClerk, useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MessageCircle, Menu, User as UserIcon, LogOut, Activity } from "lucide-react";
+import { MessageCircle, Menu, User as UserIcon, LogOut, Activity, CalendarDays } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,10 +13,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
+import { useGetMe } from "@workspace/api-client-react";
 
 export function Navbar() {
   const { signOut } = useClerk();
   const { user, isLoaded } = useUser();
+  const { data: appUser } = useGetMe();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
 
@@ -67,10 +69,17 @@ export function Navbar() {
             <Link href="/dashboard" className={linkClass}>
               Dashboard
             </Link>
-            <Link href="/assessment" className={`${linkClass} flex items-center gap-1.5`}>
-              <Activity className="w-4 h-4" />
-              Assessment
-            </Link>
+            {appUser?.role === "coach" ? (
+              <Link href="/availability" className={`${linkClass} flex items-center gap-1.5`}>
+                <CalendarDays className="w-4 h-4" />
+                My Availability
+              </Link>
+            ) : (
+              <Link href="/assessment" className={`${linkClass} flex items-center gap-1.5`}>
+                <Activity className="w-4 h-4" />
+                Assessment
+              </Link>
+            )}
             <Link href="/appointments" className={linkClass}>
               Appointments
             </Link>
@@ -157,9 +166,16 @@ export function Navbar() {
                   <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors">
                     Dashboard
                   </Link>
-                  <Link href="/assessment" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors">
-                    Assessment
-                  </Link>
+                  {appUser?.role === "coach" ? (
+                    <Link href="/availability" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors flex items-center gap-2">
+                      <CalendarDays className="w-5 h-5" />
+                      My Availability
+                    </Link>
+                  ) : (
+                    <Link href="/assessment" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors">
+                      Assessment
+                    </Link>
+                  )}
                   <Link href="/appointments" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/80 hover:text-white transition-colors">
                     Appointments
                   </Link>

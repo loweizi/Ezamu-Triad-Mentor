@@ -19,6 +19,7 @@ import { ChatPage } from "@/pages/ChatPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { ContactPage } from "@/pages/ContactPage";
 import { CoachStudentDetailPage } from "@/pages/CoachStudentDetailPage";
+import { AvailabilityPage } from "@/pages/AvailabilityPage";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -126,6 +127,9 @@ function ClerkProviderWithRoutes() {
             </Route>
             <Route path="/coach/student/:studentId">
               <ProtectedRoute component={CoachStudentDetailPage} />
+            </Route>
+            <Route path="/availability">
+              <ProtectedRoute component={AvailabilityPage} />
             </Route>
             
             <Route component={NotFound} />
