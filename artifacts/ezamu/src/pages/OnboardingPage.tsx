@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useGetMe, useOnboardUser } from "@workspace/api-client-react";
+import { useGetMe, useOnboardUser, getGetMeQueryKey } from "@workspace/api-client-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ const INTERESTS = [
 
 export function OnboardingPage() {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const { data: user, isLoading: isUserLoading } = useGetMe();
   const onboardMutation = useOnboardUser();
   
@@ -73,7 +75,11 @@ export function OnboardingPage() {
         } 
       },
       {
-        onSuccess: () => {
+        onSuccess: (updatedUser) => {
+          // Write the updated user (onboardingCompleted: true) into the cache
+          // immediately so DashboardPage sees it on first render and doesn't
+          // bounce back to /onboarding.
+          queryClient.setQueryData(getGetMeQueryKey(), updatedUser);
           localStorage.removeItem("ezamu_pending_role");
           toast.success("Welcome to Ezamu!");
           setLocation("/dashboard");
