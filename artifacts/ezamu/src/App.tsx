@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, Show, useClerk } from "@clerk/react";
+import { ClerkProvider, Show, useAuth, useClerk } from "@clerk/react";
 import { Switch, Route, Redirect, useLocation, Router as WouterRouter } from "wouter";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -59,6 +60,23 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+function ClerkApiAuthBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setAuthTokenGetter(async () => {
+      const token = await getToken();
+      return token ?? null;
+    });
+
+    return () => {
+      setAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  return null;
+}
+
 function HomeRedirect() {
   return (
     <>
@@ -98,6 +116,7 @@ function ClerkProviderWithRoutes() {
     >
       <QueryClientProvider client={queryClient}>
         <ClerkQueryClientCacheInvalidator />
+        <ClerkApiAuthBridge />
         <TooltipProvider>
           <Switch>
             <Route path="/" component={HomeRedirect} />
