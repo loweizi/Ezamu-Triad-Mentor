@@ -19,7 +19,7 @@
 import { createProxyMiddleware } from "http-proxy-middleware";
 import type { RequestHandler } from "express";
 
-const CLERK_FAPI = "https://frontend-api.clerk.dev";
+const CLERK_FAPI = "https://clerk.triad.ezamu.com";
 export const CLERK_PROXY_PATH = "/api/__clerk";
 
 export function clerkProxyMiddleware(): RequestHandler {
