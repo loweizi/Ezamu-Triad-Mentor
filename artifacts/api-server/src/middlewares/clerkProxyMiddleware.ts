@@ -33,6 +33,10 @@ export function clerkProxyMiddleware(): RequestHandler {
     return (_req, _res, next) => next();
   }
 
+  // Use a stable public proxy URL in production to avoid Host header
+  // mismatches when requests are rewritten through Vercel -> Railway.
+  const configuredProxyUrl = process.env.CLERK_PROXY_URL?.trim();
+
   return createProxyMiddleware({
     target: CLERK_FAPI,
     changeOrigin: true,
@@ -42,7 +46,8 @@ export function clerkProxyMiddleware(): RequestHandler {
       proxyReq: (proxyReq, req) => {
         const protocol = req.headers["x-forwarded-proto"] || "https";
         const host = req.headers.host || "";
-        const proxyUrl = `${protocol}://${host}${CLERK_PROXY_PATH}`;
+        const derivedProxyUrl = `${protocol}://${host}${CLERK_PROXY_PATH}`;
+        const proxyUrl = configuredProxyUrl || derivedProxyUrl;
 
         proxyReq.setHeader("Clerk-Proxy-Url", proxyUrl);
         proxyReq.setHeader("Clerk-Secret-Key", secretKey);
