@@ -8,6 +8,12 @@ import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxy
 
 const app: Express = express();
 
+// Keep health checks independent from auth/provider configuration so platforms
+// like Railway can verify process readiness reliably.
+app.get("/api/healthz", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 app.use(
   pinoHttp({
     logger,
