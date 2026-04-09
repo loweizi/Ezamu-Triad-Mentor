@@ -29,10 +29,17 @@ function resizeImageToDataUrl(file: File, maxPx = 400): Promise<string> {
   });
 }
 
-const ALL_FIELDS = [
-  "Science & Math", "Coding & Tech", "Arts & Design", 
+const STUDENT_INTERESTS = [
+  "Science & Math", "Coding & Tech", "Arts & Design",
   "Writing & Literature", "Business & Finance", "Healthcare",
-  "Psychology", "Engineering", "Music & Performance"
+  "Psychology", "Engineering", "Music & Performance",
+];
+
+const COACH_EXPERTISE = [
+  "STEM & Technology", "Arts & Creative Design", "Business & Entrepreneurship",
+  "Health & Wellness", "Writing & Communication", "College Preparation",
+  "Leadership & Personal Growth", "Career Coaching", "Social & Emotional Skills",
+  "Engineering", "Law & Advocacy", "Music & Performing Arts",
 ];
 
 export function ProfilePage() {
@@ -245,7 +252,7 @@ export function ProfilePage() {
                         {user?.role === 'coach' ? 'Fields of Expertise' : 'Fields of Interest'}
                       </Label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {ALL_FIELDS.map(field => {
+                        {(user?.role === 'coach' ? COACH_EXPERTISE : STUDENT_INTERESTS).map(field => {
                           const checked = fields.includes(field);
                           return (
                             <button

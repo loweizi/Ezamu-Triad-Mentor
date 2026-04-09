@@ -10,9 +10,9 @@ Ezamu is a full-stack triad mentorship web platform connecting students with coa
 - **Node.js version**: 24
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
-- **Frontend**: React + Vite (artifacts/ezamu)
-- **API framework**: Express 5 (artifacts/api-server)
-- **Database**: PostgreSQL + Drizzle ORM
+- **Frontend**: React + Vite (artifacts/ezamu) — hosted on Vercel
+- **API framework**: Express 5 (artifacts/api-server) — hosted on Railway
+- **Database**: PostgreSQL + Drizzle ORM — hosted on Supabase
 - **Auth**: Clerk (white-label)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
