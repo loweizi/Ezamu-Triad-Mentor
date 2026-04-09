@@ -5,8 +5,88 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useSaveAssessmentResult, useGetMe, SaveAssessmentBodyInnerHeroType } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Sparkles, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Sparkles, Loader2, TrendingUp, AlertCircle, Briefcase } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+
+const ARCHETYPE_INFO: Record<string, {
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  careers: string[];
+  /** Not shown to students — used by coaches only */
+  coachGuidance: string;
+}> = {
+  thinker: {
+    summary: "Thinkers are reflective, curious, and analytical. They like to understand how things work before taking action and often enjoy solving problems, researching ideas, and thinking deeply about decisions.",
+    strengths: [
+      "Strong critical thinking and problem-solving skills",
+      "Thoughtful and careful decision-making",
+      "Good at analyzing information and seeing patterns",
+      "Often independent and self-motivated learners",
+    ],
+    weaknesses: [
+      "May overthink or hesitate before acting",
+      "Can struggle with quick decisions",
+      "May seem quiet or less expressive in group settings",
+      "Sometimes spends too much time planning instead of doing",
+    ],
+    careers: ["Engineer", "Researcher", "Data analyst", "Software developer", "Scientist", "Architect", "Financial analyst"],
+    coachGuidance: "Knowing a student is a Thinker helps coaches understand that they may need time to process ideas before committing to a goal. Coaches can support them by giving clear explanations, encouraging confidence in decision-making, and helping them avoid getting stuck in overanalysis. Thinkers often respond well to detailed guidance, logic, and step-by-step planning.",
+  },
+  doer: {
+    summary: "Doers are action-oriented, energetic, and motivated by progress. They like to jump in, try things out, and learn through experience rather than spending too much time thinking about possibilities.",
+    strengths: [
+      "Takes initiative and gets things done",
+      "Learns well by doing and practicing",
+      "Adaptable and energetic",
+      "Often confident in taking action and solving immediate problems",
+    ],
+    weaknesses: [
+      "May act too quickly without enough planning",
+      "Can become impatient with slow processes",
+      "May overlook details",
+      "Sometimes needs help thinking through long-term consequences",
+    ],
+    careers: ["Entrepreneur", "Nurse", "Sales professional", "Skilled trades worker", "Event coordinator", "Emergency responder", "Project-based technical roles"],
+    coachGuidance: "If a student is a Doer, coaches can focus on hands-on opportunities, short-term action steps, and practical goal setting. These students usually benefit from active learning, internships, shadowing, and real-world experiences. Coaches may also need to help them slow down, reflect, and build long-term planning skills.",
+  },
+  helper: {
+    summary: "Helpers are caring, supportive, and people-centered. They are often motivated by relationships, teamwork, and making a positive difference in the lives of others.",
+    strengths: [
+      "Empathetic and supportive",
+      "Strong communication and listening skills",
+      "Good team players",
+      "Motivated by helping people succeed",
+      "Often dependable and encouraging",
+    ],
+    weaknesses: [
+      "May put others' needs before their own",
+      "Can struggle with boundaries",
+      "May avoid conflict or difficult decisions",
+      "Sometimes chooses paths based on pleasing others rather than personal goals",
+    ],
+    careers: ["Teacher", "Counselor", "Social worker", "Nurse", "Human resources specialist", "Community outreach coordinator", "Healthcare or service-oriented roles"],
+    coachGuidance: "Knowing a student is a Helper allows coaches to guide them toward careers and goals that align with service, teamwork, and meaningful relationships. Coaches can also help them build confidence in prioritizing their own needs, making independent decisions, and recognizing that their caring nature is a real strength, not just a personality trait.",
+  },
+  planner: {
+    summary: "Planners are organized, responsible, and future-focused. They like structure, clear goals, and a sense of direction. They often feel most comfortable when they know what comes next and how to get there.",
+    strengths: [
+      "Organized and dependable",
+      "Strong at setting goals and following through",
+      "Good time management and preparation",
+      "Often responsible and detail-oriented",
+      "Can create structure for themselves and others",
+    ],
+    weaknesses: [
+      "May be uncomfortable with uncertainty or sudden change",
+      "Can become overly rigid or perfectionistic",
+      "May stress over mistakes or incomplete plans",
+      "Sometimes focuses so much on structure that flexibility becomes difficult",
+    ],
+    careers: ["Project manager", "Accountant", "Operations specialist", "Business administrator", "Logistician", "Teacher", "Healthcare administration or planning roles"],
+    coachGuidance: "When coaches know a student is a Planner, they can use structured goal setting, timelines, and measurable steps to keep them motivated. Planners often do well when expectations are clear. Coaches can also help them build flexibility, manage perfectionism, and stay resilient when plans change.",
+  },
+};
 
 const QUESTIONS = [
   { id: 1, type: "single", title: "A school event is coming up. What role sounds most like you?", subtitle: "Choose the one that feels most natural.", options: [{ text: "I want to brainstorm new ideas and improve the event.", hero: "thinker" }, { text: "I want to make everyone feel included and supported.", hero: "helper" }, { text: "I want to organize the schedule and keep everything on track.", hero: "planner" }, { text: "I want to jump in, help out, and make things happen.", hero: "doer" }] },
@@ -200,10 +280,12 @@ export function AssessmentPage() {
   };
 
   if (isFinished && results) {
+    const info = ARCHETYPE_INFO[results.type];
     return (
       <MainLayout>
-        <div className="flex-1 flex items-center justify-center p-4 bg-slate-50 py-12">
-          <div className="max-w-2xl w-full">
+        <div className="flex-1 bg-slate-50 py-12 px-4">
+          <div className="container mx-auto max-w-5xl">
+            {/* Header */}
             <div className="text-center mb-10">
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#121c34] text-white mb-6 shadow-xl">
                 <Sparkles className="w-10 h-10" />
@@ -214,41 +296,107 @@ export function AssessmentPage() {
               </h2>
             </div>
 
-            <Card className="border-none shadow-lg mb-8">
-              <CardContent className="p-8">
-                <p className="text-xl text-center text-[#121c34] mb-10 leading-relaxed font-medium">
-                  {results.summary}
-                </p>
-                
-                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-6">Score Breakdown</h3>
-                
-                <div className="space-y-5">
-                  {(Object.entries(results.scores) as [string, number][])
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([type, score]) => (
-                    <div key={type}>
-                      <div className="flex justify-between mb-2">
-                        <span className="font-medium capitalize text-[#121c34]">{type}</span>
-                        <span className="font-bold text-muted-foreground">{score}%</span>
-                      </div>
-                      <Progress 
-                        value={score} 
-                        className="h-2.5" 
-                        indicatorClassName={
-                          type === 'thinker' ? 'bg-[#3131d8]' :
-                          type === 'helper' ? 'bg-[#607b7d]' :
-                          type === 'planner' ? 'bg-[#dbb68f]' :
-                          'bg-[#bb7e5d]'
-                        } 
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Two-column layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              {/* Left — score breakdown */}
+              <Card className="border-none shadow-lg">
+                <CardContent className="p-8">
+                  <p className="text-lg text-[#121c34] mb-8 leading-relaxed font-medium">
+                    {results.summary}
+                  </p>
 
-            <Button 
-              size="lg" 
+                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-6">Score Breakdown</h3>
+                  <div className="space-y-5">
+                    {(Object.entries(results.scores) as [string, number][])
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([type, score]) => (
+                      <div key={type}>
+                        <div className="flex justify-between mb-2">
+                          <span className="font-medium capitalize text-[#121c34]">{type}</span>
+                          <span className="font-bold text-muted-foreground">{score}%</span>
+                        </div>
+                        <Progress
+                          value={score}
+                          className="h-2.5"
+                          indicatorClassName={
+                            type === 'thinker' ? 'bg-[#3131d8]' :
+                            type === 'helper' ? 'bg-[#607b7d]' :
+                            type === 'planner' ? 'bg-[#dbb68f]' :
+                            'bg-[#bb7e5d]'
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Right — archetype detail */}
+              <div className="space-y-5">
+                {/* Summary */}
+                <Card className="border-none shadow-sm">
+                  <CardContent className="p-6">
+                    <p className="text-[#121c34] leading-relaxed">{info.summary}</p>
+                  </CardContent>
+                </Card>
+
+                {/* Strengths */}
+                <Card className="border-none shadow-sm">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="w-4 h-4 text-[#3131d8]" />
+                      <h3 className="font-semibold text-[#121c34]">Strengths</h3>
+                    </div>
+                    <ul className="space-y-2">
+                      {info.strengths.map((s, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-[#121c34]">
+                          <span className="mt-1 w-1.5 h-1.5 rounded-full bg-[#3131d8] flex-shrink-0" />
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+
+                {/* Weaknesses */}
+                <Card className="border-none shadow-sm">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertCircle className="w-4 h-4 text-[#bb7e5d]" />
+                      <h3 className="font-semibold text-[#121c34]">Areas to Watch</h3>
+                    </div>
+                    <ul className="space-y-2">
+                      {info.weaknesses.map((w, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-[#121c34]">
+                          <span className="mt-1 w-1.5 h-1.5 rounded-full bg-[#bb7e5d] flex-shrink-0" />
+                          {w}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+
+                {/* Careers */}
+                <Card className="border-none shadow-sm">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Briefcase className="w-4 h-4 text-[#607b7d]" />
+                      <h3 className="font-semibold text-[#121c34]">Best-Suited Career Paths</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {info.careers.map((c, i) => (
+                        <span key={i} className="text-xs bg-[#607b7d]/10 text-[#121c34] px-3 py-1.5 rounded-full font-medium">
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            <Button
+              size="lg"
               className="w-full h-14 text-lg bg-[#121c34] hover:bg-[#121c34]/90 rounded-xl"
               onClick={handleSaveToProfile}
               disabled={saveAssessment.isPending}
