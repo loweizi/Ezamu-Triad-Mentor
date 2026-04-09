@@ -12,6 +12,7 @@ import {
 } from "@workspace/api-zod";
 import { clerkClient } from "@clerk/express";
 import { requireAuth } from "../middlewares/requireAuth";
+import { getAuth } from "@clerk/express";
 
 const router: IRouter = Router();
 
@@ -88,37 +89,50 @@ router.patch("/users/me", requireAuth, async (req, res): Promise<void> => {
   }));
 });
 
-router.post("/users/onboard", requireAuth, async (req, res): Promise<void> => {
-  const clerkId = (req as any).clerkUserId as string;
-  const user = await getOrCreateUser(clerkId);
+router.post("/users/onboard", async (req, res): Promise<void> => {
+  const { isAuthenticated, userId } = getAuth(req);
+
+  if (!isAuthenticated || !userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const user = await getOrCreateUser(userId);
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
   }
+
   const parsed = OnboardUserBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+
   const updates: Partial<typeof usersTable.$inferInsert> = {
     bio: parsed.data.bio,
     onboardingCompleted: true,
   };
+
   if (parsed.data.firstName) updates.firstName = parsed.data.firstName;
   if (parsed.data.lastName) updates.lastName = parsed.data.lastName;
   if (parsed.data.age != null) updates.age = parsed.data.age;
   if (parsed.data.role) updates.role = parsed.data.role;
   if (parsed.data.fieldsOfInterest) updates.fieldsOfInterest = parsed.data.fieldsOfInterest;
   if (parsed.data.fieldsOfExpertise) updates.fieldsOfExpertise = parsed.data.fieldsOfExpertise;
+
   const [updated] = await db
     .update(usersTable)
     .set(updates)
     .where(eq(usersTable.id, user.id))
     .returning();
-  res.json(OnboardUserResponse.parse({
-    ...updated,
-    createdAt: updated.createdAt.toISOString(),
-  }));
+
+  res.json(
+    OnboardUserResponse.parse({
+      ...updated,
+      createdAt: updated.createdAt.toISOString(),
+    })
+  );
 });
 
 router.get("/users/search", requireAuth, async (req, res): Promise<void> => {
