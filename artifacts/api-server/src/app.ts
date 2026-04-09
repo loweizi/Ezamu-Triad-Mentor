@@ -4,7 +4,7 @@ import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
+//import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
 
 const app: Express = express();
 
@@ -42,10 +42,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(
   clerkMiddleware({
-    frontendApiProxy: {
-      enabled: true,
-      path: "/api/__clerk",
-    },
+    proxyUrl: "https://triad.ezamu.io/api/__clerk",
   })
 );
 
