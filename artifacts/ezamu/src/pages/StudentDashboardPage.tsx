@@ -17,7 +17,7 @@ import {
 import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, useUpdateActionItem, useGetPeerSummary, useSendNudge, getGetActionItemsQueryKey, getGetDashboardSummaryQueryKey, type SmartGoal, type ActionItem, type PeerActionItem } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2, Plus, Target, Clock, CheckCheck, XCircle, ChevronDown, ChevronUp, Check, Bell, Users } from "lucide-react";
+import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2, Plus, Target, Clock, CheckCheck, XCircle, ChevronDown, ChevronUp, Check, Bell, Users, Video } from "lucide-react";
 import { format, formatDistanceToNow, isPast, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -61,6 +61,10 @@ const STATUS_CONFIG = {
   approved: { label: "Approved", icon: CheckCheck, className: "bg-green-50 text-green-700 border-green-200" },
   denied: { label: "Needs Revision", icon: XCircle, className: "bg-red-50 text-red-700 border-red-200" },
 };
+
+function jitsiRoomName(appointmentId: number) {
+  return `ezamu-session-${appointmentId}`;
+}
 
 function GoalCard({ goal }: { goal: SmartGoal }) {
   const [expanded, setExpanded] = useState(false);
@@ -700,7 +704,20 @@ export function StudentDashboardPage() {
                             </span>
                           </div>
                           <p className="font-medium text-[#121c34] mb-1">{apt.title}</p>
-                          <p className="text-sm text-muted-foreground">with {apt.coachName}</p>
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm text-muted-foreground">with {apt.coachName}</p>
+                            <Button size="sm" variant="outline" className="h-8 px-3 text-xs" asChild>
+                              <a
+                                href={`https://meet.jit.si/${jitsiRoomName(apt.id)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Join video call for ${apt.title}`}
+                              >
+                                <Video className="w-3.5 h-3.5 mr-1.5" />
+                                Join
+                              </a>
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -41,6 +41,13 @@ const ARCHETYPE_LABELS: Record<string, string> = {
   jester: "The Jester",
 };
 
+const COACH_GUIDANCE: Record<string, string> = {
+  thinker: "Knowing a student is a Thinker helps coaches understand that they may need time to process ideas before committing to a goal. Coaches can support them by giving clear explanations, encouraging confidence in decision-making, and helping them avoid getting stuck in overanalysis. Thinkers often respond well to detailed guidance, logic, and step-by-step planning.",
+  doer: "If a student is a Doer, coaches can focus on hands-on opportunities, short-term action steps, and practical goal setting. These students usually benefit from active learning, internships, shadowing, and real-world experiences. Coaches may also need to help them slow down, reflect, and build long-term planning skills.",
+  helper: "Knowing a student is a Helper allows coaches to guide them toward careers and goals that align with service, teamwork, and meaningful relationships. Coaches can also help them build confidence in prioritizing their own needs, making independent decisions, and recognizing that their caring nature is a real strength, not just a personality trait.",
+  planner: "When coaches know a student is a Planner, they can use structured goal setting, timelines, and measurable steps to keep them motivated. Planners often do well when expectations are clear. Coaches can also help them build flexibility, manage perfectionism, and stay resilient when plans change.",
+};
+
 function SmartGoalCard({ goal, onUpdate }: { goal: SmartGoal; onUpdate: (goalId: number, status: "approved" | "denied", feedback?: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [feedback, setFeedback] = useState(goal.coachFeedback || "");
@@ -384,6 +391,12 @@ export function CoachStudentDetailPage() {
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Email</p>
                     <p className="text-sm text-[#121c34]">{student.email}</p>
+                  </div>
+                )}
+                {student.assessmentResult && COACH_GUIDANCE[student.assessmentResult.archetype] && (
+                  <div className="mt-2 p-4 rounded-xl bg-[#3131d8]/5 border border-[#3131d8]/15">
+                    <p className="text-xs font-semibold text-[#3131d8] uppercase tracking-wide mb-1.5">How to Guide This Student</p>
+                    <p className="text-sm text-[#121c34] leading-relaxed">{COACH_GUIDANCE[student.assessmentResult.archetype]}</p>
                   </div>
                 )}
               </CardContent>

@@ -5,8 +5,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useGetMe, useGetAppointments, useGetMyStudents } from "@workspace/api-client-react";
 import { Link } from "wouter";
-import { Calendar, Users, ArrowRight, Loader2, Clock, UserCircle } from "lucide-react";
+import { Calendar, Users, ArrowRight, Loader2, Clock, UserCircle, Video } from "lucide-react";
 import { format, isPast } from "date-fns";
+
+function jitsiRoomName(appointmentId: number) {
+  return `ezamu-session-${appointmentId}`;
+}
 
 export function CoachDashboardPage() {
   const { data: user, isLoading: isUserLoading } = useGetMe();
@@ -144,6 +148,17 @@ export function CoachDashboardPage() {
                           >
                             {appt.status}
                           </Badge>
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs" asChild>
+                            <a
+                              href={`https://meet.jit.si/${jitsiRoomName(appt.id)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Join video call for ${appt.title}`}
+                            >
+                              <Video className="w-3.5 h-3.5 mr-1.5" />
+                              Join
+                            </a>
+                          </Button>
                         </div>
                       ))}
                     </div>
