@@ -42,7 +42,10 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(
   clerkMiddleware({
-    proxyUrl: "https://triad.ezamu.io/api/__clerk",
+    frontendApiProxy: {
+      enabled: true,
+      path: "/api/__clerk",
+    },
   })
 );
 
