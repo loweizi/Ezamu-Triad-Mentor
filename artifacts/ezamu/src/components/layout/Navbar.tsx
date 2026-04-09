@@ -96,7 +96,7 @@ export function Navbar() {
               </Link>
             )}
             <Link href="/appointments" className={getNavLinkClass("/appointments")}>
-              Appointments
+              Coaches
             </Link>
             {appUser?.role === "student" && (
               <Link href="/peers" className={getNavLinkClass("/peers", "flex items-center gap-1.5")}>
@@ -203,7 +203,7 @@ export function Navbar() {
                     </Link>
                   )}
                   <Link href="/appointments" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/appointments")}>
-                    Appointments
+                    Coaches
                   </Link>
                   {appUser?.role === "student" && (
                     <Link href="/peers" onClick={() => setMobileMenuOpen(false)} className={`${getMobileNavLinkClass("/peers")} flex items-center gap-2`}>

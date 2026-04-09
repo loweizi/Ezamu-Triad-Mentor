@@ -395,7 +395,7 @@ export function AssessmentPage() {
     return (
       <MainLayout>
         <div className="flex-1 bg-slate-50 py-12 px-4">
-          <div className="container mx-auto max-w-5xl">
+          <div className="container mx-auto max-w-6xl">
             {/* Header */}
             <div className="text-center mb-10">
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#121c34] text-white mb-6 shadow-xl">
@@ -407,28 +407,24 @@ export function AssessmentPage() {
               </h2>
             </div>
 
-            {/* Two-column layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              {/* Left — score breakdown */}
+            {/* 2×3 grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Row 1 — Score Breakdown */}
               <Card className="border-none shadow-lg">
                 <CardContent className="p-8">
-                  <p className="text-lg text-[#121c34] mb-8 leading-relaxed font-medium">
-                    {results.summary}
-                  </p>
-
-                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-6">Score Breakdown</h3>
-                  <div className="space-y-5">
+                  <h3 className="font-bold text-base text-muted-foreground uppercase tracking-wider mb-6">Score Breakdown</h3>
+                  <div className="space-y-6">
                     {(Object.entries(results.scores) as [string, number][])
                       .sort((a, b) => b[1] - a[1])
                       .map(([type, score]) => (
                       <div key={type}>
                         <div className="flex justify-between mb-2">
-                          <span className="font-medium capitalize text-[#121c34]">{type}</span>
-                          <span className="font-bold text-muted-foreground">{score}%</span>
+                          <span className="font-semibold text-lg capitalize text-[#121c34]">{type}</span>
+                          <span className="font-bold text-lg text-muted-foreground">{score}%</span>
                         </div>
                         <Progress
                           value={score}
-                          className="h-2.5"
+                          className="h-3"
                           indicatorClassName={
                             type === 'thinker' ? 'bg-[#3131d8]' :
                             type === 'helper' ? 'bg-[#607b7d]' :
@@ -442,68 +438,68 @@ export function AssessmentPage() {
                 </CardContent>
               </Card>
 
-              {/* Right — archetype detail */}
-              <div className="space-y-5">
-                {/* Summary */}
-                <Card className="border-none shadow-sm">
-                  <CardContent className="p-6">
-                    <p className="text-[#121c34] leading-relaxed">{info.summary}</p>
-                  </CardContent>
-                </Card>
+              {/* Row 1 — Summary */}
+              <Card className="border-none shadow-lg">
+                <CardContent className="p-8 flex flex-col justify-center h-full">
+                  <p className="text-xl text-[#121c34] leading-relaxed font-medium mb-6">
+                    {results.summary}
+                  </p>
+                  <p className="text-base text-[#121c34]/80 leading-relaxed">{info.summary}</p>
+                </CardContent>
+              </Card>
 
-                {/* Strengths */}
-                <Card className="border-none shadow-sm">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-4 h-4 text-[#3131d8]" />
-                      <h3 className="font-semibold text-[#121c34]">Strengths</h3>
-                    </div>
-                    <ul className="space-y-2">
-                      {info.strengths.map((s, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-[#121c34]">
-                          <span className="mt-1 w-1.5 h-1.5 rounded-full bg-[#3131d8] flex-shrink-0" />
-                          {s}
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
+              {/* Row 2 — Strengths */}
+              <Card className="border-none shadow-lg">
+                <CardContent className="p-8">
+                  <div className="flex items-center gap-2 mb-5">
+                    <TrendingUp className="w-5 h-5 text-[#3131d8]" />
+                    <h3 className="font-bold text-lg text-[#121c34]">Strengths</h3>
+                  </div>
+                  <ul className="space-y-3">
+                    {info.strengths.map((s, i) => (
+                      <li key={i} className="flex items-start gap-3 text-base text-[#121c34]">
+                        <span className="mt-2 w-2 h-2 rounded-full bg-[#3131d8] flex-shrink-0" />
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
 
-                {/* Weaknesses */}
-                <Card className="border-none shadow-sm">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <AlertCircle className="w-4 h-4 text-[#bb7e5d]" />
-                      <h3 className="font-semibold text-[#121c34]">Areas to Watch</h3>
-                    </div>
-                    <ul className="space-y-2">
-                      {info.weaknesses.map((w, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-[#121c34]">
-                          <span className="mt-1 w-1.5 h-1.5 rounded-full bg-[#bb7e5d] flex-shrink-0" />
-                          {w}
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
+              {/* Row 2 — Areas to Watch */}
+              <Card className="border-none shadow-lg">
+                <CardContent className="p-8">
+                  <div className="flex items-center gap-2 mb-5">
+                    <AlertCircle className="w-5 h-5 text-[#bb7e5d]" />
+                    <h3 className="font-bold text-lg text-[#121c34]">Areas to Watch</h3>
+                  </div>
+                  <ul className="space-y-3">
+                    {info.weaknesses.map((w, i) => (
+                      <li key={i} className="flex items-start gap-3 text-base text-[#121c34]">
+                        <span className="mt-2 w-2 h-2 rounded-full bg-[#bb7e5d] flex-shrink-0" />
+                        {w}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
 
-                {/* Careers */}
-                <Card className="border-none shadow-sm">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Briefcase className="w-4 h-4 text-[#607b7d]" />
-                      <h3 className="font-semibold text-[#121c34]">Best-Suited Career Paths</h3>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {info.careers.map((c, i) => (
-                        <span key={i} className="text-xs bg-[#607b7d]/10 text-[#121c34] px-3 py-1.5 rounded-full font-medium">
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              {/* Row 3 — Career Paths (spans full width) */}
+              <Card className="border-none shadow-lg md:col-span-2">
+                <CardContent className="p-8">
+                  <div className="flex items-center gap-2 mb-5">
+                    <Briefcase className="w-5 h-5 text-[#607b7d]" />
+                    <h3 className="font-bold text-lg text-[#121c34]">Best-Suited Career Paths</h3>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {info.careers.map((c, i) => (
+                      <span key={i} className="text-base bg-[#607b7d]/10 text-[#121c34] px-4 py-2 rounded-full font-medium">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             <Button

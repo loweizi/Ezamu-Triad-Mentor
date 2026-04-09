@@ -32,6 +32,11 @@ function statusColor(status: string) {
   return "bg-yellow-50 text-yellow-700 border-yellow-200";
 }
 
+function statusLabel(status: string) {
+  if (status === "pending") return "Upcoming";
+  return status;
+}
+
 function jitsiRoomName(appointmentId: number) {
   return `ezamu-session-${appointmentId}`;
 }
@@ -272,7 +277,7 @@ function AppointmentCard({
 
       <div className="flex items-center gap-3 flex-shrink-0">
         <Badge className={`text-xs capitalize border ${statusColor(appt.status)}`}>
-          {appt.status}
+          {statusLabel(appt.status)}
         </Badge>
         {!isPast && (
           <div className="flex items-center gap-1.5 text-[#3131d8] text-xs font-medium">
