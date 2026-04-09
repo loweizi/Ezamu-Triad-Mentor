@@ -429,7 +429,7 @@ export function CoachStudentDetailPage() {
                           }`}
                           variant="outline"
                         >
-                          {appt.status}
+                          {appt.status === "pending" ? "upcoming" : appt.status}
                         </Badge>
                       </div>
                     ))}

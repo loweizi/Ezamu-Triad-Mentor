@@ -146,7 +146,7 @@ export function CoachDashboardPage() {
                             } border`}
                             variant="outline"
                           >
-                            {appt.status}
+                            {appt.status === "pending" ? "upcoming" : appt.status}
                           </Badge>
                           <Button size="sm" variant="outline" className="h-8 px-3 text-xs" asChild>
                             <a
