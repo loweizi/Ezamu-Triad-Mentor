@@ -14,6 +14,7 @@ import coachRouter from "./coach";
 import smartGoalsRouter from "./smart-goals";
 import coachNotesRouter from "./coach-notes";
 import peersRouter from "./peers";
+import guardianRouter from "./guardian";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(coachRouter);
 router.use(smartGoalsRouter);
 router.use(coachNotesRouter);
 router.use(peersRouter);
+router.use(guardianRouter);
 
 export default router;

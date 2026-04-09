@@ -73,6 +73,48 @@ export function useGetMyStudentDetail(studentId: number | null) {
   });
 }
 
+export interface GuardianStudentDetail {
+  student: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    profilePicUrl: string | null;
+    innerHeroArchetype: string | null;
+    fieldsOfInterest: string[];
+    bio: string | null;
+    age: number | null;
+  };
+  assessment: {
+    innerHeroType: string;
+    helperScore: number;
+    doerScore: number;
+    thinkerScore: number;
+    plannerScore: number;
+    summary: string;
+    dateTaken: string;
+  } | null;
+  smartGoals: SmartGoal[];
+  actionItems: {
+    id: number;
+    studentId: number;
+    coachId?: number | null;
+    smartGoalId?: number | null;
+    title: string;
+    description?: string | null;
+    completed: boolean;
+    createdAt: string;
+  }[];
+}
+
+export function useGetGuardianStudentDetail(studentId: number | null) {
+  return useQuery<GuardianStudentDetail>({
+    queryKey: ["guardian", "student", studentId],
+    queryFn: () => customFetch<GuardianStudentDetail>(`/api/guardian/student?studentId=${studentId}`),
+    enabled: studentId !== null,
+  });
+}
+
 export function useGetSmartGoals(studentId?: number) {
   const url = studentId ? `/api/smart-goals?studentId=${studentId}` : "/api/smart-goals";
   return useQuery<SmartGoal[]>({

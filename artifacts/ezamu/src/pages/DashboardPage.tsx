@@ -10,13 +10,14 @@ import { StudentDashboardPage } from "./StudentDashboardPage";
 export function DashboardPage() {
   const [, setLocation] = useLocation();
   const { isLoaded, isSignedIn } = useAuth();
-  const { data: user, isLoading: isUserLoading } = useGetMe({
-    query: { enabled: isLoaded && isSignedIn === true },
-  });
+  const { data: user, isLoading: isUserLoading } = useGetMe();
 
   useEffect(() => {
     if (!isUserLoading && user && !user.onboardingCompleted) {
       setLocation("/onboarding");
+    }
+    if (!isUserLoading && user?.role === "guardian") {
+      setLocation("/guardian");
     }
   }, [user, isUserLoading, setLocation]);
 
@@ -34,6 +35,8 @@ export function DashboardPage() {
   if (user?.role === "coach") {
     return <CoachDashboardPage />;
   }
+
+  if (user?.role === "guardian") return null;
 
   return <StudentDashboardPage />;
 }
