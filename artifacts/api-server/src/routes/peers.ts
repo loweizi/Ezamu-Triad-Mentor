@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ne, and, or } from "drizzle-orm";
-import { db, usersTable, peerRequestsTable, actionItemsTable, smartGoalsTable, notificationsTable } from "@workspace/db";
+import { db, usersTable, peerRequestsTable, actionItemsTable, smartGoalsTable, notificationsTable, messagesTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
@@ -23,7 +23,11 @@ router.get("/students", requireAuth, async (req, res): Promise<void> => {
       age: usersTable.age,
     })
     .from(usersTable)
-    .where(and(eq(usersTable.role, "student"), ne(usersTable.id, me.id)));
+    .where(and(
+      eq(usersTable.role, "student"),
+      eq(usersTable.onboardingCompleted, true),
+      ne(usersTable.id, me.id)
+    ));
 
   const requests = await db
     .select()
@@ -89,6 +93,12 @@ router.post("/peer-requests", requireAuth, async (req, res): Promise<void> => {
   const { toUserId } = req.body;
   if (!toUserId || typeof toUserId !== "number") { res.status(400).json({ error: "toUserId required" }); return; }
 
+  const [targetUser] = await db.select().from(usersTable).where(eq(usersTable.id, toUserId));
+  if (!targetUser || targetUser.role !== "student" || !targetUser.onboardingCompleted) {
+    res.status(400).json({ error: "Peer requests can only be sent to onboarded students" });
+    return;
+  }
+
   const [existing] = await db
     .select()
     .from(peerRequestsTable)
@@ -130,6 +140,26 @@ router.patch("/peer-requests/:id", requireAuth, async (req, res): Promise<void> 
   if (status === "accepted") {
     await db.update(usersTable).set({ peerId: peerReq.fromUserId }).where(eq(usersTable.id, peerReq.toUserId));
     await db.update(usersTable).set({ peerId: peerReq.toUserId }).where(eq(usersTable.id, peerReq.fromUserId));
+
+    const [requester] = await db.select().from(usersTable).where(eq(usersTable.id, peerReq.fromUserId));
+    const [recipient] = await db.select().from(usersTable).where(eq(usersTable.id, peerReq.toUserId));
+
+    if (requester && recipient) {
+      await db.insert(messagesTable).values([
+        {
+          senderId: requester.id,
+          receiverId: recipient.id,
+          content: `You and ${requester.firstName} have been matched as peers. Start by sharing your first action item!`,
+          read: false,
+        },
+        {
+          senderId: recipient.id,
+          receiverId: requester.id,
+          content: `You and ${recipient.firstName} have been matched as peers. Start by sharing your first action item!`,
+          read: false,
+        },
+      ]);
+    }
   }
 
   res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
