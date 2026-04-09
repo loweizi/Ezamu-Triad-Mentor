@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, useUpdateActionItem, useGetPeerSummary, useSendNudge, getGetActionItemsQueryKey, getGetDashboardSummaryQueryKey, type SmartGoal, type ActionItem, type PeerActionItem } from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, useUpdateActionItem, useGetPeerSummary, useSendNudge, useSendMessage, getGetActionItemsQueryKey, getGetDashboardSummaryQueryKey, type SmartGoal, type ActionItem, type PeerActionItem } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2, Plus, Target, Clock, CheckCheck, XCircle, ChevronDown, ChevronUp, Check, Bell, Users, Video } from "lucide-react";
@@ -310,6 +310,7 @@ export function StudentDashboardPage() {
   const updateActionItem = useUpdateActionItem();
   const { data: peerSummary } = useGetPeerSummary();
   const sendNudge = useSendNudge();
+  const sendMessage = useSendMessage();
   const [nudgedIds, setNudgedIds] = useState<Set<number>>(new Set());
   const [nudgedAll, setNudgedAll] = useState(false);
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
@@ -340,6 +341,18 @@ export function StudentDashboardPage() {
       } else {
         setNudgedAll(true);
         setTimeout(() => setNudgedAll(false), 5000);
+      }
+      if (peerSummary?.peer.id && user) {
+        const targetTask = taskTitle ?? peerSummary.actionItems[0]?.title;
+        if (targetTask) {
+          const senderName = `${user.firstName} ${user.lastName}`;
+          await sendMessage.mutateAsync({
+            data: {
+              receiverId: peerSummary.peer.id,
+              content: `${senderName} has nudged you to work on ${targetTask}!`,
+            },
+          });
+        }
       }
       toast({ title: "Nudge sent!", description: `${peerSummary?.peer.firstName} has been notified.` });
     } catch {
