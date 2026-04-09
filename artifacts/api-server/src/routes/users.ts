@@ -27,29 +27,66 @@ async function fetchClerkUser(clerkId: string): Promise<{ email: string; firstNa
   }
 }
 
-async function getOrCreateUser(clerkId: string): Promise<typeof usersTable.$inferSelect | null> {
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
-  if (user) return user;
+async function getOrCreateUser(
+  clerkId: string
+): Promise<typeof usersTable.$inferSelect | null> {
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.clerkId, clerkId));
 
-  // User doesn't exist yet — fetch their info from Clerk and auto-create
+    if (user) return user;
+  } catch (error: any) {
+    console.error("getOrCreateUser: initial select failed");
+    console.error("message:", error?.message);
+    console.error("cause:", error?.cause);
+    console.error("stack:", error?.stack);
+    throw error;
+  }
+
   const clerkData = await fetchClerkUser(clerkId);
   if (!clerkData?.email) return null;
 
-  const [created] = await db.insert(usersTable).values({
-    clerkId,
-    email: clerkData.email,
-    firstName: clerkData.firstName,
-    lastName: clerkData.lastName,
-    role: "student",
-    fieldsOfInterest: [],
-    fieldsOfExpertise: [],
-    onboardingCompleted: false,
-  }).onConflictDoNothing().returning();
+  try {
+    const [created] = await db
+      .insert(usersTable)
+      .values({
+        clerkId,
+        email: clerkData.email,
+        firstName: clerkData.firstName,
+        lastName: clerkData.lastName,
+        role: "student",
+        fieldsOfInterest: [],
+        fieldsOfExpertise: [],
+        onboardingCompleted: false,
+      })
+      .onConflictDoNothing()
+      .returning();
 
-  if (created) return created;
+    if (created) return created;
+  } catch (error: any) {
+    console.error("getOrCreateUser: insert failed");
+    console.error("message:", error?.message);
+    console.error("cause:", error?.cause);
+    console.error("stack:", error?.stack);
+    throw error;
+  }
 
-  const [refetch] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
-  return refetch ?? null;
+  try {
+    const [refetch] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.clerkId, clerkId));
+
+    return refetch ?? null;
+  } catch (error: any) {
+    console.error("getOrCreateUser: refetch failed");
+    console.error("message:", error?.message);
+    console.error("cause:", error?.cause);
+    console.error("stack:", error?.stack);
+    throw error;
+  }
 }
 
 router.get("/users/me", requireAuth, async (req, res): Promise<void> => {

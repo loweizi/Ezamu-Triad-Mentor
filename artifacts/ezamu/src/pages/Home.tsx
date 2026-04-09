@@ -68,7 +68,7 @@ export function Home() {
           <div className="flex-1 max-w-xl">
             <h1 className="font-sans text-4xl md:text-5xl font-bold leading-tight mb-6 tracking-tight">
               <span className="text-white">Ezamu</span>
-              <span className="text-white/80 font-normal">: The All-In-One Career &amp; College Guidance Platform</span>
+              <span className="text-white/80 font-normal">: The All-In-One Mentorship Platform</span>
             </h1>
             <p className="text-base md:text-lg text-white/75 mb-10 leading-relaxed">
               Connect with verified mentors, counsellors, and peers to discover majors best for you, explore career paths,
