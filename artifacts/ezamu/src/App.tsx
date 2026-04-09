@@ -61,10 +61,13 @@ function ClerkQueryClientCacheInvalidator() {
 }
 
 function ClerkApiAuthBridge() {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
 
   useEffect(() => {
+    if (!isLoaded) return;
+
     setAuthTokenGetter(async () => {
+      if (!isSignedIn) return null;
       const token = await getToken();
       return token ?? null;
     });
@@ -72,7 +75,7 @@ function ClerkApiAuthBridge() {
     return () => {
       setAuthTokenGetter(null);
     };
-  }, [getToken]);
+  }, [getToken, isLoaded, isSignedIn]);
 
   return null;
 }

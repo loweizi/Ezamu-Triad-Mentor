@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +28,10 @@ const COACH_EXPERTISE = [
 export function OnboardingPage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  const { data: user, isLoading: isUserLoading } = useGetMe();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { data: user, isLoading: isUserLoading } = useGetMe({
+    query: { enabled: isLoaded && isSignedIn === true },
+  });
   const onboardMutation = useOnboardUser();
 
   const pendingRole = (localStorage.getItem("ezamu_pending_role") as "student" | "coach" | "guardian" | null)

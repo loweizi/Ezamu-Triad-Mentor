@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useAuth } from "@clerk/react";
 import { useGetMe } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
@@ -8,7 +9,10 @@ import { StudentDashboardPage } from "./StudentDashboardPage";
 
 export function DashboardPage() {
   const [, setLocation] = useLocation();
-  const { data: user, isLoading: isUserLoading } = useGetMe();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { data: user, isLoading: isUserLoading } = useGetMe({
+    query: { enabled: isLoaded && isSignedIn === true },
+  });
 
   useEffect(() => {
     if (!isUserLoading && user && !user.onboardingCompleted) {
