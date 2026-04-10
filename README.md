@@ -63,6 +63,6 @@ Ezamu is a full-stack triad mentorship web platform connecting students with coa
 
 - **Student**: takes assessment, books coaches, receives action items
 - **Coach**: manages availability, assigns action items, views student progress
-- **Guardian**: read-only view of their student's dashboard (invite-based)
+- **Guardian**: read-only view of their student's dashboard
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
