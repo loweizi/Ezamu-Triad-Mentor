@@ -12,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useGetCoach, useGetCoachAvailability, useCreateAppointment, getGetCoachQueryKey, getGetCoachAvailabilityQueryKey, getGetAppointmentsQueryKey } from "@workspace/api-client-react";
+import { useGetCoach, useGetCoachAvailability, useCreateAppointment, getGetCoachQueryKey, getGetCoachAvailabilityQueryKey, getGetAppointmentsQueryKey, useGetMe } from "@workspace/api-client-react";
 import { useParams, useLocation } from "wouter";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -32,14 +32,19 @@ export function CoachProfilePage() {
   const { coachId } = useParams();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { data: me, isLoading: isMeLoading } = useGetMe();
   
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [pendingSlot, setPendingSlot] = useState<{ id: number; date: string; startTime: string; endTime: string } | null>(null);
   
   const id = parseInt(coachId || "0");
+  const isGuardian = me?.role === "guardian";
   
   const { data: coach, isLoading: isCoachLoading } = useGetCoach(id, { query: { enabled: !!id, queryKey: getGetCoachQueryKey(id) } });
-  const { data: availability, isLoading: isAvailLoading } = useGetCoachAvailability({ coachId: id }, { query: { enabled: !!id, queryKey: getGetCoachAvailabilityQueryKey({ coachId: id }) } });
+  const { data: availability, isLoading: isAvailLoading } = useGetCoachAvailability(
+    { coachId: id },
+    { query: { enabled: !!id && !isMeLoading && !isGuardian, queryKey: getGetCoachAvailabilityQueryKey({ coachId: id }) } }
+  );
   
   const createAppointment = useCreateAppointment();
 
@@ -87,7 +92,7 @@ export function CoachProfilePage() {
     });
   };
 
-  if (isCoachLoading || isAvailLoading) {
+  if (isCoachLoading || isMeLoading || (!isGuardian && isAvailLoading)) {
     return (
       <MainLayout>
         <div className="flex-1 flex items-center justify-center">
@@ -158,77 +163,78 @@ export function CoachProfilePage() {
                 </CardContent>
               </Card>
 
-              {/* Booking Section */}
-              <Card className="border-none shadow-sm">
-                <CardHeader className="border-b bg-slate-50/50 pb-4">
-                  <CardTitle className="text-xl font-serif text-[#121c34] flex items-center">
-                    <CalendarIcon className="w-5 h-5 mr-2 text-[#3131d8]" />
-                    Book a Session
-                  </CardTitle>
-                  <CardDescription>Select an available time slot below</CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                  {availableDates.length > 0 ? (
-                    <div className="space-y-6">
-                      {/* Date Selection */}
-                      <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
-                        {availableDates.map(date => {
-                          const dateObj = parseISO(date);
-                          const isSelected = selectedDate === date;
-                          return (
-                            <button
-                              key={date}
-                              onClick={() => setSelectedDate(date)}
-                              className={`flex flex-col items-center min-w-[80px] p-3 rounded-xl border-2 transition-colors ${
-                                isSelected 
-                                  ? "border-[#121c34] bg-[#121c34] text-white" 
-                                  : "border-slate-200 hover:border-[#121c34]/30 bg-white"
-                              }`}
-                            >
-                              <span className={`text-xs font-medium uppercase ${isSelected ? "text-white/80" : "text-muted-foreground"}`}>
-                                {format(dateObj, "MMM")}
-                              </span>
-                              <span className="text-xl font-bold my-1">{format(dateObj, "d")}</span>
-                              <span className={`text-xs font-medium ${isSelected ? "text-white/80" : "text-muted-foreground"}`}>
-                                {format(dateObj, "EEE")}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Time Slots */}
-                      {selectedDate && availabilityByDate[selectedDate] && (
-                        <div>
-                          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center">
-                            <Clock className="w-4 h-4 mr-1.5" />
-                            Available times for {format(parseISO(selectedDate), "MMMM d, yyyy")}
-                          </h3>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {availabilityByDate[selectedDate].map(slot => (
-                              <Button
-                                key={slot.id}
-                                variant="outline"
-                                className="h-12 border-slate-200 hover:border-[#3131d8] hover:text-[#3131d8] font-medium"
-                                onClick={() => handleSlotClick(slot)}
-                                disabled={createAppointment.isPending}
+              {!isGuardian && (
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="border-b bg-slate-50/50 pb-4">
+                    <CardTitle className="text-xl font-serif text-[#121c34] flex items-center">
+                      <CalendarIcon className="w-5 h-5 mr-2 text-[#3131d8]" />
+                      Book a Session
+                    </CardTitle>
+                    <CardDescription>Select an available time slot below</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    {availableDates.length > 0 ? (
+                      <div className="space-y-6">
+                        {/* Date Selection */}
+                        <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
+                          {availableDates.map(date => {
+                            const dateObj = parseISO(date);
+                            const isSelected = selectedDate === date;
+                            return (
+                              <button
+                                key={date}
+                                onClick={() => setSelectedDate(date)}
+                                className={`flex flex-col items-center min-w-[80px] p-3 rounded-xl border-2 transition-colors ${
+                                  isSelected 
+                                    ? "border-[#121c34] bg-[#121c34] text-white" 
+                                    : "border-slate-200 hover:border-[#121c34]/30 bg-white"
+                                }`}
                               >
-                                {formatSlotTime(slot.startTime)}
-                              </Button>
-                            ))}
-                          </div>
+                                <span className={`text-xs font-medium uppercase ${isSelected ? "text-white/80" : "text-muted-foreground"}`}>
+                                  {format(dateObj, "MMM")}
+                                </span>
+                                <span className="text-xl font-bold my-1">{format(dateObj, "d")}</span>
+                                <span className={`text-xs font-medium ${isSelected ? "text-white/80" : "text-muted-foreground"}`}>
+                                  {format(dateObj, "EEE")}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-10">
-                      <CalendarIcon className="w-10 h-10 mx-auto text-slate-300 mb-3" />
-                      <p className="text-[#121c34] font-medium mb-1">No availability right now</p>
-                      <p className="text-sm text-muted-foreground">Check back later for open slots.</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+
+                        {/* Time Slots */}
+                        {selectedDate && availabilityByDate[selectedDate] && (
+                          <div>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center">
+                              <Clock className="w-4 h-4 mr-1.5" />
+                              Available times for {format(parseISO(selectedDate), "MMMM d, yyyy")}
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                              {availabilityByDate[selectedDate].map(slot => (
+                                <Button
+                                  key={slot.id}
+                                  variant="outline"
+                                  className="h-12 border-slate-200 hover:border-[#3131d8] hover:text-[#3131d8] font-medium"
+                                  onClick={() => handleSlotClick(slot)}
+                                  disabled={createAppointment.isPending}
+                                >
+                                  {formatSlotTime(slot.startTime)}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-10">
+                        <CalendarIcon className="w-10 h-10 mx-auto text-slate-300 mb-3" />
+                        <p className="text-[#121c34] font-medium mb-1">No availability right now</p>
+                        <p className="text-sm text-muted-foreground">Check back later for open slots.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Sidebar Stats */}
@@ -255,73 +261,74 @@ export function CoachProfilePage() {
         </div>
       </div>
 
-      {/* Booking Confirmation Dialog */}
-      <Dialog open={!!pendingSlot} onOpenChange={(open) => { if (!open) setPendingSlot(null); }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <div className="flex justify-center mb-3">
-              <div className="w-12 h-12 rounded-full bg-[#3131d8]/10 flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6 text-[#3131d8]" />
+      {!isGuardian && (
+        <Dialog open={!!pendingSlot} onOpenChange={(open) => { if (!open) setPendingSlot(null); }}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <div className="flex justify-center mb-3">
+                <div className="w-12 h-12 rounded-full bg-[#3131d8]/10 flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-[#3131d8]" />
+                </div>
               </div>
-            </div>
-            <DialogTitle className="text-center text-[#121c34] font-serif text-xl">
-              Confirm Your Booking
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              You're about to book a session with {coach?.firstName} {coach?.lastName}.
-            </DialogDescription>
-          </DialogHeader>
+              <DialogTitle className="text-center text-[#121c34] font-serif text-xl">
+                Confirm Your Booking
+              </DialogTitle>
+              <DialogDescription className="text-center">
+                You're about to book a session with {coach?.firstName} {coach?.lastName}.
+              </DialogDescription>
+            </DialogHeader>
 
-          {pendingSlot && (
-            <div className="my-2 rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#121c34]/10 flex items-center justify-center flex-shrink-0">
-                  <CalendarIcon className="w-4 h-4 text-[#121c34]" />
+            {pendingSlot && (
+              <div className="my-2 rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#121c34]/10 flex items-center justify-center flex-shrink-0">
+                    <CalendarIcon className="w-4 h-4 text-[#121c34]" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Date</p>
+                    <p className="text-sm font-semibold text-[#121c34]">
+                      {format(parseISO(pendingSlot.date), "EEEE, MMMM d, yyyy")}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Date</p>
-                  <p className="text-sm font-semibold text-[#121c34]">
-                    {format(parseISO(pendingSlot.date), "EEEE, MMMM d, yyyy")}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#121c34]/10 flex items-center justify-center flex-shrink-0">
+                    <Clock className="w-4 h-4 text-[#121c34]" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Time</p>
+                    <p className="text-sm font-semibold text-[#121c34]">
+                      {formatSlotTime(pendingSlot.startTime)} – {formatSlotTime(pendingSlot.endTime)}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#121c34]/10 flex items-center justify-center flex-shrink-0">
-                  <Clock className="w-4 h-4 text-[#121c34]" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Time</p>
-                  <p className="text-sm font-semibold text-[#121c34]">
-                    {formatSlotTime(pendingSlot.startTime)} – {formatSlotTime(pendingSlot.endTime)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+            )}
 
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setPendingSlot(null)}
-              disabled={createAppointment.isPending}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmBook}
-              disabled={createAppointment.isPending}
-              className="flex-1 bg-[#3131d8] hover:bg-[#3131d8]/90 text-white border-none"
-            >
-              {createAppointment.isPending ? (
-                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Booking…</>
-              ) : (
-                "Confirm Booking"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => setPendingSlot(null)}
+                disabled={createAppointment.isPending}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmBook}
+                disabled={createAppointment.isPending}
+                className="flex-1 bg-[#3131d8] hover:bg-[#3131d8]/90 text-white border-none"
+              >
+                {createAppointment.isPending ? (
+                  <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Booking…</>
+                ) : (
+                  "Confirm Booking"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </MainLayout>
   );
 }

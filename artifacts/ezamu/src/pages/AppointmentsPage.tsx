@@ -5,12 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useGetCoaches, getGetCoachesQueryKey } from "@workspace/api-client-react";
+import { useGetCoaches, getGetCoachesQueryKey, useGetMe } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Search, Star, Filter } from "lucide-react";
 
 export function AppointmentsPage() {
   const [search, setSearch] = useState("");
+  const { data: me } = useGetMe();
+  const isGuardian = me?.role === "guardian";
 
   const { data: coaches, isLoading } = useGetCoaches({ search }, { query: { queryKey: getGetCoachesQueryKey({ search }) } });
 
@@ -101,7 +103,7 @@ export function AppointmentsPage() {
                   <div className="p-6 pt-0 mt-auto">
                     <Link href={`/coach/${coach.id}`}>
                       <Button className="w-full bg-[#121c34] hover:bg-[#121c34]/90">
-                        View Profile & Book
+                        {isGuardian ? "View Profile" : "View Profile & Book"}
                       </Button>
                     </Link>
                   </div>

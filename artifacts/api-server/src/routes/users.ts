@@ -1,6 +1,18 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { eq, ilike, or } from "drizzle-orm";
+import {
+  actionItemsTable,
+  appointmentsTable,
+  assessmentResultsTable,
+  coachAvailabilityTable,
+  coachNotesTable,
+  db,
+  messagesTable,
+  notificationsTable,
+  peerRequestsTable,
+  smartGoalsTable,
+  usersTable,
+} from "@workspace/db";
 import {
   GetMeResponse,
   UpdateMeBody,
@@ -156,6 +168,51 @@ router.post("/users/onboard", requireAuth, async (req, res): Promise<void> => {
     ...updated,
     createdAt: updated.createdAt.toISOString(),
   }));
+});
+
+router.delete("/users/me", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const user = await getOrCreateUser(clerkId);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    // Remove dependencies first so user-row deletion cannot violate constraints.
+    await tx.delete(peerRequestsTable).where(eq(peerRequestsTable.fromUserId, user.id));
+    await tx.delete(peerRequestsTable).where(eq(peerRequestsTable.toUserId, user.id));
+
+    await tx.delete(messagesTable).where(eq(messagesTable.senderId, user.id));
+    await tx.delete(messagesTable).where(eq(messagesTable.receiverId, user.id));
+
+    await tx.delete(notificationsTable).where(eq(notificationsTable.userId, user.id));
+    await tx.delete(actionItemsTable).where(eq(actionItemsTable.studentId, user.id));
+    await tx.delete(actionItemsTable).where(eq(actionItemsTable.coachId, user.id));
+
+    await tx.delete(appointmentsTable).where(eq(appointmentsTable.studentId, user.id));
+    await tx.delete(appointmentsTable).where(eq(appointmentsTable.coachId, user.id));
+    await tx.delete(appointmentsTable).where(eq(appointmentsTable.peerId, user.id));
+
+    await tx.delete(smartGoalsTable).where(eq(smartGoalsTable.studentId, user.id));
+    await tx.delete(smartGoalsTable).where(eq(smartGoalsTable.coachId, user.id));
+
+    await tx.delete(coachNotesTable).where(eq(coachNotesTable.studentId, user.id));
+    await tx.delete(coachNotesTable).where(eq(coachNotesTable.coachId, user.id));
+
+    await tx.delete(coachAvailabilityTable).where(eq(coachAvailabilityTable.coachId, user.id));
+    await tx.delete(assessmentResultsTable).where(eq(assessmentResultsTable.studentId, user.id));
+
+    // Clear logical links from other users before deleting this user.
+    await tx
+      .update(usersTable)
+      .set({ coachId: null, peerId: null })
+      .where(or(eq(usersTable.coachId, user.id), eq(usersTable.peerId, user.id)));
+
+    await tx.delete(usersTable).where(eq(usersTable.id, user.id));
+  });
+
+  res.status(204).send();
 });
 
 router.get("/users/search", requireAuth, async (req, res): Promise<void> => {

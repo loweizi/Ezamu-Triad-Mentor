@@ -54,6 +54,10 @@ router.post("/appointments", requireAuth, async (req, res): Promise<void> => {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  if (user.role !== "student") {
+    res.status(403).json({ error: "Only students can book appointments" });
+    return;
+  }
   const parsed = CreateAppointmentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

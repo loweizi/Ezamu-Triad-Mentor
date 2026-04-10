@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useGetMe, useUpdateMe, getGetMeQueryKey } from "@workspace/api-client-react";
-import { useClerk, useUser } from "@clerk/react";
+import { useAuth, useClerk, useUser } from "@clerk/react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Camera, Save, Check, KeyRound, Mail, Trash2 } from "lucide-react";
@@ -59,6 +59,7 @@ export function ProfilePage() {
   const queryClient = useQueryClient();
   const { data: user, isLoading } = useGetMe();
   const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+  const { getToken } = useAuth();
   const { signOut } = useClerk();
   const updateMe = useUpdateMe();
   const isCoach = user?.role === "coach";
@@ -215,6 +216,12 @@ export function ProfilePage() {
       await clerkUser.update({ primaryEmailAddressId: pendingEmail.id });
       await clerkUser.reload();
 
+      const syncedEmail = clerkUser.primaryEmailAddress?.emailAddress;
+      if (syncedEmail) {
+        await updateMe.mutateAsync({ data: { email: syncedEmail } });
+        queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+      }
+
       setNewEmail("");
       setEmailVerificationCode("");
       setPendingEmailAddressId(null);
@@ -274,6 +281,16 @@ export function ProfilePage() {
 
     setIsDeletingAccount(true);
     try {
+      const token = await getToken();
+      const deleteResponse = await fetch(`${basePath}/api/users/me`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!deleteResponse.ok && deleteResponse.status !== 404) {
+        throw new Error("Failed to delete user from application database");
+      }
+
       await clerkUser.delete();
       await signOut();
       window.location.href = `${basePath}/`;
