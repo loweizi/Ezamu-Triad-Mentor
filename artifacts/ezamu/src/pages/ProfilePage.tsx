@@ -5,11 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useGetMe, useUpdateMe, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useClerk, useUser } from "@clerk/react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Camera, Save, Check } from "lucide-react";
+import { Loader2, Camera, Save, Check, KeyRound, Mail, Trash2 } from "lucide-react";
 
 function resizeImageToDataUrl(file: File, maxPx = 400): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -43,9 +55,14 @@ const COACH_EXPERTISE = [
 ];
 
 export function ProfilePage() {
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
   const queryClient = useQueryClient();
   const { data: user, isLoading } = useGetMe();
+  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+  const { signOut } = useClerk();
   const updateMe = useUpdateMe();
+  const isCoach = user?.role === "coach";
+  const isGuardian = user?.role === "guardian";
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -53,6 +70,17 @@ export function ProfilePage() {
   const [age, setAge] = useState("");
   const [fields, setFields] = useState<string[]>([]);
   const [uploadingPic, setUploadingPic] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [emailVerificationCode, setEmailVerificationCode] = useState("");
+  const [pendingEmailAddressId, setPendingEmailAddressId] = useState<string | null>(null);
+  const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
+  const [isEmailVerifying, setIsEmailVerifying] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -96,15 +124,24 @@ export function ProfilePage() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    updateMe.mutate({
-      data: {
-        firstName,
-        lastName,
-        bio,
-        age: age ? parseInt(age) : null,
-        ...(user?.role === 'coach' ? { fieldsOfExpertise: fields } : { fieldsOfInterest: fields })
+
+    const payload: Record<string, unknown> = {
+      firstName,
+      lastName,
+    };
+
+    if (!isGuardian) {
+      payload.bio = bio;
+      payload.age = age ? parseInt(age) : null;
+      if (isCoach) {
+        payload.fieldsOfExpertise = fields;
+      } else {
+        payload.fieldsOfInterest = fields;
       }
+    }
+
+    updateMe.mutate({
+      data: payload as Parameters<typeof updateMe.mutate>[0]["data"],
     }, {
       onSuccess: () => {
         toast.success("Profile updated successfully");
@@ -114,6 +151,136 @@ export function ProfilePage() {
         toast.error("Failed to update profile");
       }
     });
+  };
+
+  const handleStartEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clerkUser) {
+      toast.error("Account data is not ready yet.");
+      return;
+    }
+
+    const email = newEmail.trim().toLowerCase();
+    if (!email) {
+      toast.error("Please enter a new email address.");
+      return;
+    }
+
+    const currentEmail = clerkUser.primaryEmailAddress?.emailAddress?.toLowerCase();
+    if (currentEmail && email === currentEmail) {
+      toast.error("Please enter an email that is different from your current one.");
+      return;
+    }
+
+    setIsEmailSubmitting(true);
+    try {
+      const emailAddress = await clerkUser.createEmailAddress({ email });
+      await emailAddress.prepareVerification({ strategy: "email_code" });
+      setPendingEmailAddressId(emailAddress.id);
+      toast.success("Verification code sent. Check your inbox to continue.");
+    } catch {
+      toast.error("Could not start email update. Please try again.");
+    } finally {
+      setIsEmailSubmitting(false);
+    }
+  };
+
+  const handleVerifyEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clerkUser || !pendingEmailAddressId) {
+      toast.error("Start an email change first.");
+      return;
+    }
+
+    const code = emailVerificationCode.trim();
+    if (!code) {
+      toast.error("Enter the verification code from your email.");
+      return;
+    }
+
+    setIsEmailVerifying(true);
+    try {
+      let pendingEmail = clerkUser.emailAddresses.find((emailAddress) => emailAddress.id === pendingEmailAddressId);
+      if (!pendingEmail) {
+        await clerkUser.reload();
+        pendingEmail = clerkUser.emailAddresses.find((emailAddress) => emailAddress.id === pendingEmailAddressId);
+      }
+
+      if (!pendingEmail) {
+        toast.error("Could not find pending email change. Please restart this step.");
+        return;
+      }
+
+      await pendingEmail.attemptVerification({ code });
+      await clerkUser.update({ primaryEmailAddressId: pendingEmail.id });
+      await clerkUser.reload();
+
+      setNewEmail("");
+      setEmailVerificationCode("");
+      setPendingEmailAddressId(null);
+      toast.success("Email updated successfully.");
+    } catch {
+      toast.error("Invalid or expired code. Please try again.");
+    } finally {
+      setIsEmailVerifying(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clerkUser) {
+      toast.error("Account data is not ready yet.");
+      return;
+    }
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      toast.error("Please fill out all password fields.");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      toast.error("New password and confirmation do not match.");
+      return;
+    }
+
+    setIsPasswordSubmitting(true);
+    try {
+      await clerkUser.updatePassword({
+        currentPassword,
+        newPassword,
+        signOutOfOtherSessions: false,
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      toast.success("Password updated successfully.");
+    } catch {
+      toast.error("Could not update password. Check your current password and try again.");
+    } finally {
+      setIsPasswordSubmitting(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!clerkUser) {
+      toast.error("Account data is not ready yet.");
+      return;
+    }
+
+    if (deleteConfirmText !== "DELETE") {
+      toast.error('Type DELETE to confirm account deletion.');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      await clerkUser.delete();
+      await signOut();
+      window.location.href = `${basePath}/`;
+    } catch {
+      toast.error("Failed to delete account. Please try again.");
+      setIsDeletingAccount(false);
+    }
   };
 
   if (isLoading) {
@@ -202,7 +369,11 @@ export function ProfilePage() {
               <Card className="border-none shadow-sm">
                 <CardHeader>
                   <CardTitle>Personal Information</CardTitle>
-                  <CardDescription>Update your public profile details.</CardDescription>
+                  <CardDescription>
+                    {isGuardian
+                      ? "Update your name details."
+                      : "Update your public profile details."}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSave} className="space-y-6">
@@ -225,59 +396,63 @@ export function ProfilePage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="age">Age</Label>
-                      <Input 
-                        id="age" 
-                        type="number"
-                        value={age} 
-                        onChange={e => setAge(e.target.value)} 
-                        className="max-w-[150px]"
-                      />
-                    </div>
+                    {!isGuardian && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="age">Age</Label>
+                          <Input 
+                            id="age" 
+                            type="number"
+                            value={age} 
+                            onChange={e => setAge(e.target.value)} 
+                            className="max-w-[150px]"
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea 
-                        id="bio" 
-                        value={bio} 
-                        onChange={e => setBio(e.target.value)} 
-                        className="min-h-[120px]"
-                        placeholder="Tell us a bit about yourself..."
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="bio">Bio</Label>
+                          <Textarea 
+                            id="bio" 
+                            value={bio} 
+                            onChange={e => setBio(e.target.value)} 
+                            className="min-h-[120px]"
+                            placeholder="Tell us a bit about yourself..."
+                          />
+                        </div>
 
-                    <div className="space-y-3 pt-4 border-t">
-                      <Label className="text-base font-semibold">
-                        {user?.role === 'coach' ? 'Fields of Expertise' : 'Fields of Interest'}
-                      </Label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {(user?.role === 'coach' ? COACH_EXPERTISE : STUDENT_INTERESTS).map(field => {
-                          const checked = fields.includes(field);
-                          return (
-                            <button
-                              key={field}
-                              type="button"
-                              onClick={() => handleFieldToggle(field)}
-                              className={`flex items-center gap-3 p-3 rounded-lg border text-left w-full transition-colors ${
-                                checked
-                                  ? "border-[#3131d8] bg-[#3131d8]/5"
-                                  : "border-slate-200 hover:border-[#3131d8]/30"
-                              }`}
-                            >
-                              <div className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
-                                checked
-                                  ? "bg-[#3131d8] border-[#3131d8]"
-                                  : "bg-white border-slate-300"
-                              }`}>
-                                {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                              </div>
-                              <span className="flex-1 font-medium text-sm text-[#121c34]">{field}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                        <div className="space-y-3 pt-4 border-t">
+                          <Label className="text-base font-semibold">
+                            {isCoach ? "Fields of Expertise" : "Fields of Interest"}
+                          </Label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {(isCoach ? COACH_EXPERTISE : STUDENT_INTERESTS).map(field => {
+                              const checked = fields.includes(field);
+                              return (
+                                <button
+                                  key={field}
+                                  type="button"
+                                  onClick={() => handleFieldToggle(field)}
+                                  className={`flex items-center gap-3 p-3 rounded-lg border text-left w-full transition-colors ${
+                                    checked
+                                      ? "border-[#3131d8] bg-[#3131d8]/5"
+                                      : "border-slate-200 hover:border-[#3131d8]/30"
+                                  }`}
+                                >
+                                  <div className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
+                                    checked
+                                      ? "bg-[#3131d8] border-[#3131d8]"
+                                      : "bg-white border-slate-300"
+                                  }`}>
+                                    {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                  </div>
+                                  <span className="flex-1 font-medium text-sm text-[#121c34]">{field}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     <div className="pt-4 flex justify-end">
                       <Button 
@@ -290,6 +465,170 @@ export function ProfilePage() {
                       </Button>
                     </div>
                   </form>
+                </CardContent>
+              </Card>
+
+              <Card className="border-none shadow-sm mt-8">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    Email Address
+                  </CardTitle>
+                  <CardDescription>Change your account email and verify it with a code.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label>Current Email</Label>
+                    <Input
+                      value={clerkUser?.primaryEmailAddress?.emailAddress ?? user?.email ?? ""}
+                      readOnly
+                    />
+                  </div>
+
+                  <form onSubmit={handleStartEmailChange} className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="newEmail">New Email</Label>
+                      <Input
+                        id="newEmail"
+                        type="email"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        placeholder="name@example.com"
+                      />
+                    </div>
+                    <Button type="submit" variant="outline" disabled={!isClerkLoaded || isEmailSubmitting}>
+                      {isEmailSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                      Send Verification Code
+                    </Button>
+                  </form>
+
+                  {pendingEmailAddressId && (
+                    <form onSubmit={handleVerifyEmailChange} className="space-y-3 pt-2 border-t">
+                      <div className="space-y-2">
+                        <Label htmlFor="emailCode">Verification Code</Label>
+                        <Input
+                          id="emailCode"
+                          value={emailVerificationCode}
+                          onChange={(e) => setEmailVerificationCode(e.target.value)}
+                          placeholder="Enter code from your email"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Button type="submit" disabled={!isClerkLoaded || isEmailVerifying}>
+                          {isEmailVerifying ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                          Verify and Update Email
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => {
+                            setPendingEmailAddressId(null);
+                            setEmailVerificationCode("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-none shadow-sm mt-8">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <KeyRound className="w-4 h-4" />
+                    Password
+                  </CardTitle>
+                  <CardDescription>Enter your current password before setting a new one.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handlePasswordChange} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="currentPassword">Current Password</Label>
+                      <Input
+                        id="currentPassword"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        autoComplete="current-password"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="newPassword">New Password</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+                      <Input
+                        id="confirmNewPassword"
+                        type="password"
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                    <Button type="submit" disabled={!isClerkLoaded || isPasswordSubmitting}>
+                      {isPasswordSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                      Update Password
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-red-200 shadow-sm mt-8">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-red-700">
+                    <Trash2 className="w-4 h-4" />
+                    Delete Account
+                  </CardTitle>
+                  <CardDescription>This action is permanent and cannot be undone.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="deleteConfirm">Type DELETE to confirm</Label>
+                    <Input
+                      id="deleteConfirm"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder="DELETE"
+                    />
+                  </div>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" disabled={!isClerkLoaded || isDeletingAccount}>
+                        {isDeletingAccount ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                        Delete Account
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently remove your sign-in account. Type DELETE above, then confirm below.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={(e) => {
+                            e.preventDefault();
+                            void handleDeleteAccount();
+                          }}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          Yes, delete my account
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </CardContent>
               </Card>
             </div>

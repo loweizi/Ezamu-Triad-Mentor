@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/react";
@@ -41,6 +41,8 @@ export function OnboardingPage() {
   const pendingLastName = localStorage.getItem("ezamu_pending_lastName") || user?.lastName || "";
 
   const isCoach = pendingRole === "coach";
+  const isGuardian = pendingRole === "guardian";
+  const hasStartedGuardianAutoOnboarding = useRef(false);
 
   const [step, setStep] = useState(1);
   const [age, setAge] = useState<string>("");
@@ -48,10 +50,58 @@ export function OnboardingPage() {
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
 
   useEffect(() => {
-    if (user?.onboardingCompleted) {
-      setLocation("/dashboard");
+    if (!user?.onboardingCompleted) {
+      return;
     }
+
+    if (user.role === "guardian") {
+      setLocation("/guardian");
+      return;
+    }
+
+    setLocation("/dashboard");
   }, [user, setLocation]);
+
+  useEffect(() => {
+    if (isUserLoading || !isGuardian || hasStartedGuardianAutoOnboarding.current || user?.onboardingCompleted) {
+      return;
+    }
+
+    hasStartedGuardianAutoOnboarding.current = true;
+    onboardMutation.mutate(
+      {
+        data: {
+          role: "guardian",
+          bio: "Guardian account",
+          ...(pendingFirstName ? { firstName: pendingFirstName } : {}),
+          ...(pendingLastName ? { lastName: pendingLastName } : {}),
+        },
+      },
+      {
+        onSuccess: (updatedUser) => {
+          queryClient.setQueryData(getGetMeQueryKey(), updatedUser);
+          localStorage.removeItem("ezamu_pending_role");
+          localStorage.removeItem("ezamu_pending_firstName");
+          localStorage.removeItem("ezamu_pending_lastName");
+          toast.success("Welcome to Ezamu!");
+          setLocation("/guardian");
+        },
+        onError: () => {
+          hasStartedGuardianAutoOnboarding.current = false;
+          toast.error("Failed to set up your guardian account. Please try again.");
+        },
+      }
+    );
+  }, [
+    isUserLoading,
+    isGuardian,
+    user,
+    onboardMutation,
+    pendingFirstName,
+    pendingLastName,
+    queryClient,
+    setLocation,
+  ]);
 
   const fieldOptions = isCoach ? COACH_EXPERTISE : STUDENT_INTERESTS;
 
@@ -127,6 +177,17 @@ export function OnboardingPage() {
       <MainLayout>
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (isGuardian) {
+    return (
+      <MainLayout>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+          <p className="text-sm text-muted-foreground">Setting up your guardian account...</p>
         </div>
       </MainLayout>
     );

@@ -89,12 +89,12 @@ export function Navbar() {
                 <CalendarDays className="w-4 h-4" />
                 My Availability
               </Link>
-            ) : (
+            ) : appUser?.role === "student" ? (
               <Link href="/assessment" className={getNavLinkClass("/assessment", "flex items-center gap-1.5")}>
                 <Activity className="w-4 h-4" />
                 Assessment
               </Link>
-            )}
+            ) : null}
             <Link href="/appointments" className={getNavLinkClass("/appointments")}>
               Coaches
             </Link>
@@ -197,11 +197,11 @@ export function Navbar() {
                       <CalendarDays className="w-5 h-5" />
                       My Availability
                     </Link>
-                  ) : (
+                  ) : appUser?.role === "student" ? (
                     <Link href="/assessment" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/assessment")}>
                       Assessment
                     </Link>
-                  )}
+                  ) : null}
                   <Link href="/appointments" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/appointments")}>
                     Coaches
                   </Link>

@@ -241,6 +241,12 @@ export function AssessmentPage() {
     doer: latestResult.doerScore,
   } : null;
 
+  useEffect(() => {
+    if (user?.role === "guardian") {
+      setLocation("/guardian");
+    }
+  }, [user, setLocation]);
+
   if (isUserLoading || isLatestLoading) {
     return (
       <MainLayout>
@@ -249,6 +255,10 @@ export function AssessmentPage() {
         </div>
       </MainLayout>
     );
+  }
+
+  if (user?.role === "guardian") {
+    return null;
   }
 
   const question = QUESTIONS[currentStep];
