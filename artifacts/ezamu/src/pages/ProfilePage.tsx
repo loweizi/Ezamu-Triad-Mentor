@@ -291,6 +291,14 @@ export function ProfilePage() {
         throw new Error("Failed to delete user from application database");
       }
 
+      // Clear guardian linkage cache keys so a recreated account starts clean.
+      for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+        const key = window.localStorage.key(i);
+        if (key?.startsWith("guardian.studentEmail")) {
+          window.localStorage.removeItem(key);
+        }
+      }
+
       await clerkUser.delete();
       await signOut();
       window.location.href = `${basePath}/`;

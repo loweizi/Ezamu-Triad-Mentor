@@ -11,6 +11,7 @@ import {
   useGetMe,
   searchUsers,
   useGetGuardianStudentDetail,
+  useSendMessage,
   type ActionItem,
   type SmartGoal,
 } from "@workspace/api-client-react";
@@ -37,23 +38,35 @@ const ARCHETYPE_LABELS: Record<string, string> = {
   planner: "The Planner",
 };
 
-const STORAGE_KEY = "guardian.studentEmail";
+const LEGACY_STORAGE_KEY = "guardian.studentEmail";
+
+function getScopedStorageKey(clerkId: string) {
+  return `${LEGACY_STORAGE_KEY}:${clerkId}`;
+}
 
 export function GuardianPage() {
   const { toast } = useToast();
   const { data: me, isLoading: isMeLoading } = useGetMe();
+  const sendMessage = useSendMessage();
 
   const [studentEmailInput, setStudentEmailInput] = useState("");
   const [linkedEmail, setLinkedEmail] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<number | null>(null);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (!me?.clerkId) return;
+
+    const scopedKey = getScopedStorageKey(me.clerkId);
+    const saved = window.localStorage.getItem(scopedKey);
     if (saved) {
       setStudentEmailInput(saved);
       setLinkedEmail(saved);
+      return;
     }
-  }, []);
+
+    // Cleanup old unscoped key to prevent cross-account leakage on shared browsers.
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+  }, [me?.clerkId]);
 
   const {
     data: studentData,
@@ -96,20 +109,58 @@ export function GuardianPage() {
   const approvedGoals = studentData?.smartGoals.filter((g) => g.status === "approved") ?? [];
   const pendingGoals = studentData?.smartGoals.filter((g) => g.status === "pending") ?? [];
 
+  const handleNudgeStudent = () => {
+    if (!studentData?.student?.id) {
+      toast({ title: "Student not loaded", description: "Please try again.", variant: "destructive" });
+      return;
+    }
+
+    const firstActionItem = studentData.actionItems[0];
+    if (!firstActionItem) {
+      toast({ title: "No action items", description: "Your student has no action items to nudge yet.", variant: "destructive" });
+      return;
+    }
+
+    const guardianFirstName = me?.firstName?.trim() || "Your guardian";
+    const message = `${guardianFirstName} has nudged you to work on ${firstActionItem.title}`;
+
+    sendMessage.mutate(
+      {
+        data: {
+          receiverId: studentData.student.id,
+          content: message,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Nudge sent", description: "Your student has been nudged in chat." });
+        },
+        onError: () => {
+          toast({ title: "Failed to send nudge", description: "Please try again.", variant: "destructive" });
+        },
+      }
+    );
+  };
+
   const handleLinkStudent = async () => {
     const value = studentEmailInput.trim().toLowerCase();
     if (!value) {
       toast({ title: "Email required", description: "Enter your child's email to continue.", variant: "destructive" });
       return;
     }
-    window.localStorage.setItem(STORAGE_KEY, value);
+    if (me?.clerkId) {
+      window.localStorage.setItem(getScopedStorageKey(me.clerkId), value);
+    }
     setLinkedEmail(value);
   };
 
   const handleChangeStudent = () => {
     setLinkedEmail(null);
     setStudentId(null);
-    window.localStorage.removeItem(STORAGE_KEY);
+    if (me?.clerkId) {
+      window.localStorage.removeItem(getScopedStorageKey(me.clerkId));
+    }
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
   };
 
   if (isMeLoading) {
@@ -380,11 +431,26 @@ export function GuardianPage() {
 
               <Card className="shadow-sm border-none">
                 <CardHeader className="border-b bg-slate-50/50 pb-4">
-                  <CardTitle className="text-xl font-serif text-[#121c34] flex items-center gap-2">
-                    <ListChecks className="w-5 h-5 text-[#607b7d]" />
-                    Action Items
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">Read-only task list</p>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <CardTitle className="text-xl font-serif text-[#121c34] flex items-center gap-2">
+                        <ListChecks className="w-5 h-5 text-[#607b7d]" />
+                        Action Items
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">Read-only task list</p>
+                    </div>
+                    <Button
+                      onClick={handleNudgeStudent}
+                      disabled={sendMessage.isPending || studentData.actionItems.length === 0}
+                      className="bg-[#3131d8] hover:bg-[#3131d8]/90"
+                    >
+                      {sendMessage.isPending ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>
+                      ) : (
+                        "Nudge Student"
+                      )}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-4 space-y-2">
                   {studentData.actionItems.length === 0 ? (
