@@ -10,7 +10,7 @@ type Role = "student" | "coach" | "guardian";
 const ROLES: { value: Role; label: string; description: string; icon: React.ReactNode; color: string }[] = [
   {
     value: "student",
-    label: "Student",
+    label: "Student/Peers",
     description: "I'm a student looking for guidance, coaching, and a plan for my future.",
     icon: <GraduationCap className="w-8 h-8" />,
     color: "from-[#3131d8] to-[#5b5be8]",

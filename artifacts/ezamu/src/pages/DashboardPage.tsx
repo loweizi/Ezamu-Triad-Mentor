@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { CoachDashboardPage } from "./CoachDashboardPage";
 import { StudentDashboardPage } from "./StudentDashboardPage";
+import { WelcomeGettingStartedDialog } from "@/components/WelcomeGettingStartedDialog";
 
 export function DashboardPage() {
   const [, setLocation] = useLocation();
@@ -21,7 +22,7 @@ export function DashboardPage() {
     }
   }, [user, isUserLoading, setLocation]);
 
-  if (isUserLoading) {
+  if (!isLoaded || (isLoaded && !isSignedIn) || isUserLoading) {
     return (
       <MainLayout>
         <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
@@ -33,10 +34,20 @@ export function DashboardPage() {
   }
 
   if (user?.role === "coach") {
-    return <CoachDashboardPage />;
+    return (
+      <>
+        <WelcomeGettingStartedDialog role="coach" firstName={user.firstName} />
+        <CoachDashboardPage />
+      </>
+    );
   }
 
   if (user?.role === "guardian") return null;
 
-  return <StudentDashboardPage />;
+  return (
+    <>
+      <WelcomeGettingStartedDialog role="student" firstName={user?.firstName} />
+      <StudentDashboardPage />
+    </>
+  );
 }

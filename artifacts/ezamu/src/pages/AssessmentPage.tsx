@@ -698,7 +698,12 @@ export function AssessmentPage() {
                           <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 mr-4">
                             {currentRank + 1}
                           </div>
-                          <span className="text-lg font-medium text-[#121c34] flex-1">{opt.text}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-lg font-medium text-[#121c34]">{opt.text}</p>
+                            <p className="mt-1 text-sm leading-relaxed text-slate-500">
+                              {ARCHETYPE_INFO[opt.hero].summary}
+                            </p>
+                          </div>
                         </div>
                       );
                     })}

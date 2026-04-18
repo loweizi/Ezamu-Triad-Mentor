@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useGetMe, useOnboardUser, getGetMeQueryKey } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
+import { queueGettingStartedModal } from "@/components/WelcomeGettingStartedDialog";
 
 const STUDENT_INTERESTS = [
   "Science & Math", "Coding & Tech", "Arts & Design",
@@ -162,6 +163,7 @@ export function OnboardingPage() {
           localStorage.removeItem("ezamu_pending_role");
           localStorage.removeItem("ezamu_pending_firstName");
           localStorage.removeItem("ezamu_pending_lastName");
+          queueGettingStartedModal();
           toast.success("Welcome to Ezamu!");
           setLocation("/dashboard");
         },
