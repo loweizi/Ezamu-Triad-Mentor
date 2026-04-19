@@ -2,7 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useSaveAssessmentResult, useGetMe, useGetLatestAssessmentResult, SaveAssessmentBodyInnerHeroType } from "@workspace/api-client-react";
+import {
+  useSaveAssessmentResult,
+  useGetMe,
+  useGetLatestAssessmentResult,
+  SaveAssessmentBodyInnerHeroType,
+} from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Sparkles, Loader2, TrendingUp, AlertCircle, Briefcase, History } from "lucide-react";
@@ -236,13 +241,6 @@ export function AssessmentPage() {
     }
   }, [currentStep]);
 
-  const previousScores = latestResult ? {
-    thinker: latestResult.thinkerScore,
-    helper: latestResult.helperScore,
-    planner: latestResult.plannerScore,
-    doer: latestResult.doerScore,
-  } : null;
-
   useEffect(() => {
     if (user?.role === "guardian") {
       setLocation("/guardian");
@@ -428,7 +426,7 @@ export function AssessmentPage() {
                 <History className="w-10 h-10" />
               </div>
               <h1 className="text-4xl font-serif font-bold text-[#121c34] mb-2">
-                Your Latest Assessment Result
+                {latestResult ? "Assessment Result" : "Your Latest Assessment Result"}
               </h1>
               <h2 className="text-5xl font-black capitalize text-transparent bg-clip-text bg-gradient-to-r from-[#121c34] to-[#3131d8]">
                 The {latestResult.innerHeroType}
@@ -723,162 +721,151 @@ export function AssessmentPage() {
         </div>
 
         <div className="flex-1 container mx-auto max-w-5xl p-6 py-12 flex gap-10">
-          {/* Left sidebar — previous result */}
-          {latestResult && previousScores && (
-            <aside className="hidden lg:block w-72 flex-shrink-0">
-              {/* <div className="sticky top-28">
-                <div className="flex items-center gap-2 mb-4 text-muted-foreground">
-                  <History className="w-4 h-4" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">Your Last Result</span>
-                </div>
-                <ArchetypeResultPanel type={latestResult.innerHeroType} scores={previousScores} />
-              </div> */}
-            </aside>
-          )}
+          <div className="max-w-3xl mx-auto flex flex-col min-w-0">
+            {/* Quiz content */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="mb-12">
+                <h1 className="text-3xl md:text-4xl font-serif font-bold text-[#121c34] mb-3 leading-tight">
+                  {question.title}
+                </h1>
+                <p className="text-lg text-muted-foreground">
+                  {question.subtitle}
+                </p>
+              </div>
 
-          {/* Quiz content */}
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="mb-12">
-              <h1 className="text-3xl md:text-4xl font-serif font-bold text-[#121c34] mb-3 leading-tight">
-                {question.title}
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                {question.subtitle}
-              </p>
-            </div>
-
-            <div className="flex-1">
-              {question.type === "single" && (
-                <div className="space-y-4">
-                  {question.options.map((opt, idx) => {
-                    const isSelected = answers[question.id]?.[0] === idx;
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => handleSingleSelect(idx)}
-                        className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 flex items-center gap-4 ${isSelected
-                          ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.01]"
-                          : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
-                          }`}
-                      >
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "border-[#3131d8]" : "border-slate-300"
-                          }`}>
-                          {isSelected && <div className="w-3 h-3 rounded-full bg-[#3131d8]" />}
-                        </div>
-                        <span className="text-lg font-medium text-[#121c34]">{opt.text}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {question.type === "card-select" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {question.options.map((opt, idx) => {
-                    const isSelected = answers[question.id]?.[0] === idx;
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => handleSingleSelect(idx)}
-                        className={`w-full text-left p-8 rounded-3xl border-2 transition-all duration-200 flex flex-col items-center justify-center text-center gap-4 h-48 ${isSelected
-                          ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.02]"
-                          : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
-                          }`}
-                      >
-                        <span className="text-xl font-medium text-[#121c34] leading-snug">{opt.text}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {question.type === "multi" && (
-                <>
-                  <div className="space-y-4 mb-8">
+              <div className="flex-1">
+                {question.type === "single" && (
+                  <div className="space-y-4">
                     {question.options.map((opt, idx) => {
-                      const isSelected = currentMultiSelection.includes(idx);
-                      const isDisabled = !isSelected && currentMultiSelection.length >= (question.maxSelections || 2);
-
+                      const isSelected = answers[question.id]?.[0] === idx;
                       return (
                         <button
                           key={idx}
-                          onClick={() => handleMultiSelect(idx)}
-                          disabled={isDisabled}
+                          onClick={() => handleSingleSelect(idx)}
                           className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 flex items-center gap-4 ${isSelected
-                            ? "border-[#607b7d] bg-[#607b7d]/5 shadow-md"
-                            : isDisabled
-                              ? "border-slate-100 opacity-50 cursor-not-allowed"
-                              : "border-slate-200 hover:border-[#607b7d]/40 hover:bg-slate-50"
+                            ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.01]"
+                            : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
                             }`}
                         >
-                          <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "border-[#607b7d] bg-[#607b7d]" : "border-slate-300"
+                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "border-[#3131d8]" : "border-slate-300"
                             }`}>
-                            {isSelected && <CheckCircleIcon className="w-4 h-4 text-white" />}
+                            {isSelected && <div className="w-3 h-3 rounded-full bg-[#3131d8]" />}
                           </div>
                           <span className="text-lg font-medium text-[#121c34]">{opt.text}</span>
                         </button>
                       );
                     })}
                   </div>
-                  <Button
-                    size="lg"
-                    className="w-full h-14 text-lg bg-[#121c34] hover:bg-[#121c34]/90 rounded-xl"
-                    onClick={submitMultiSelect}
-                    disabled={currentMultiSelection.length !== question.maxSelections}
-                  >
-                    Continue <ChevronRight className="ml-2" />
-                  </Button>
-                </>
-              )}
+                )}
 
-              {question.type === "ranking" && (
-                <>
-                  <div className="space-y-3 mb-8">
-                    {rankingOrder.map((originalIndex, currentRank) => {
-                      const opt = question.options[originalIndex];
+                {question.type === "card-select" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {question.options.map((opt, idx) => {
+                      const isSelected = answers[question.id]?.[0] === idx;
                       return (
-                        <div
-                          key={originalIndex}
-                          className="flex items-center p-4 rounded-xl border-2 border-slate-200 bg-white shadow-sm"
+                        <button
+                          key={idx}
+                          onClick={() => handleSingleSelect(idx)}
+                          className={`w-full text-left p-8 rounded-3xl border-2 transition-all duration-200 flex flex-col items-center justify-center text-center gap-4 h-48 ${isSelected
+                            ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.02]"
+                            : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
+                            }`}
                         >
-                          <div className="flex flex-col gap-1 mr-4">
-                            <button
-                              onClick={() => moveRanking(currentRank, 'up')}
-                              disabled={currentRank === 0}
-                              className="p-1 text-slate-400 hover:text-[#121c34] disabled:opacity-30 transition-colors"
-                            >
-                              <ArrowUp className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => moveRanking(currentRank, 'down')}
-                              disabled={currentRank === rankingOrder.length - 1}
-                              className="p-1 text-slate-400 hover:text-[#121c34] disabled:opacity-30 transition-colors"
-                            >
-                              <ArrowDown className="w-5 h-5" />
-                            </button>
-                          </div>
-                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 mr-4">
-                            {currentRank + 1}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-lg font-medium text-[#121c34]">{opt.text}</p>
-                            <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                              {ARCHETYPE_INFO[opt.hero].summary}
-                            </p>
-                          </div>
-                        </div>
+                          <span className="text-xl font-medium text-[#121c34] leading-snug">{opt.text}</span>
+                        </button>
                       );
                     })}
                   </div>
-                  <Button
-                    size="lg"
-                    className="w-full h-14 text-lg bg-[#dbb68f] text-[#121c34] hover:bg-[#dbb68f]/90 rounded-xl font-bold"
-                    onClick={submitRanking}
-                  >
-                    See My Results
-                  </Button>
-                </>
-              )}
+                )}
+
+                {question.type === "multi" && (
+                  <>
+                    <div className="space-y-4 mb-8">
+                      {question.options.map((opt, idx) => {
+                        const isSelected = currentMultiSelection.includes(idx);
+                        const isDisabled = !isSelected && currentMultiSelection.length >= (question.maxSelections || 2);
+
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => handleMultiSelect(idx)}
+                            disabled={isDisabled}
+                            className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 flex items-center gap-4 ${isSelected
+                              ? "border-[#607b7d] bg-[#607b7d]/5 shadow-md"
+                              : isDisabled
+                                ? "border-slate-100 opacity-50 cursor-not-allowed"
+                                : "border-slate-200 hover:border-[#607b7d]/40 hover:bg-slate-50"
+                              }`}
+                          >
+                            <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "border-[#607b7d] bg-[#607b7d]" : "border-slate-300"
+                              }`}>
+                              {isSelected && <CheckCircleIcon className="w-4 h-4 text-white" />}
+                            </div>
+                            <span className="text-lg font-medium text-[#121c34]">{opt.text}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <Button
+                      size="lg"
+                      className="w-full h-14 text-lg bg-[#121c34] hover:bg-[#121c34]/90 rounded-xl"
+                      onClick={submitMultiSelect}
+                      disabled={currentMultiSelection.length !== question.maxSelections}
+                    >
+                      Continue <ChevronRight className="ml-2" />
+                    </Button>
+                  </>
+                )}
+
+                {question.type === "ranking" && (
+                  <>
+                    <div className="space-y-3 mb-8">
+                      {rankingOrder.map((originalIndex, currentRank) => {
+                        const opt = question.options[originalIndex];
+                        return (
+                          <div
+                            key={originalIndex}
+                            className="flex items-center p-4 rounded-xl border-2 border-slate-200 bg-white shadow-sm"
+                          >
+                            <div className="flex flex-col gap-1 mr-4">
+                              <button
+                                onClick={() => moveRanking(currentRank, 'up')}
+                                disabled={currentRank === 0}
+                                className="p-1 text-slate-400 hover:text-[#121c34] disabled:opacity-30 transition-colors"
+                              >
+                                <ArrowUp className="w-5 h-5" />
+                              </button>
+                              <button
+                                onClick={() => moveRanking(currentRank, 'down')}
+                                disabled={currentRank === rankingOrder.length - 1}
+                                className="p-1 text-slate-400 hover:text-[#121c34] disabled:opacity-30 transition-colors"
+                              >
+                                <ArrowDown className="w-5 h-5" />
+                              </button>
+                            </div>
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 mr-4">
+                              {currentRank + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-lg font-medium text-[#121c34]">{opt.text}</p>
+                              <p className="mt-1 text-sm leading-relaxed text-slate-500">
+                                {ARCHETYPE_INFO[opt.hero].summary}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <Button
+                      size="lg"
+                      className="w-full h-14 text-lg bg-[#dbb68f] text-[#121c34] hover:bg-[#dbb68f]/90 rounded-xl font-bold"
+                      onClick={submitRanking}
+                    >
+                      See My Results
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

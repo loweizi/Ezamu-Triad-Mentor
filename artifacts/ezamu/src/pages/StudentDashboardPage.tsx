@@ -14,10 +14,36 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useGetDashboardSummary, useGetActionItems, useGetAppointments, useGetMe, useGetSmartGoals, useCreateSmartGoal, useUpdateActionItem, useGetPeerSummary, useSendNudge, useSendMessage, getGetActionItemsQueryKey, getGetDashboardSummaryQueryKey, type SmartGoal, type ActionItem, type PeerActionItem } from "@workspace/api-client-react";
+import {
+  useGetDashboardSummary,
+  useGetActionItems,
+  useGetAppointments,
+  useGetMe,
+  useGetSmartGoals,
+  useCreateSmartGoal,
+  useUpdateActionItem,
+  useGetPeerSummary,
+  useSendNudge,
+  useSendMessage,
+  useGetAssessmentResults,
+  getGetActionItemsQueryKey,
+  getGetDashboardSummaryQueryKey,
+  type SmartGoal,
+  type ActionItem,
+  type PeerActionItem,
+  type AssessmentResult,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Activity, Calendar, CheckCircle2, MessageCircle, ArrowRight, Loader2, Plus, Target, Clock, CheckCheck, XCircle, ChevronDown, ChevronUp, Check, Bell, Users, Video } from "lucide-react";
+import {
+  Activity, Calendar,
+  CheckCircle2, MessageCircle,
+  ArrowRight, Loader2,
+  Plus, Target, Clock,
+  CheckCheck, XCircle, ChevronDown,
+  ChevronUp, Check, Bell, Users,
+  Video, TrendingUp, AlertCircle, Briefcase, History
+} from "lucide-react";
 import { format, formatDistanceToNow, isPast, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -60,6 +86,80 @@ const STATUS_CONFIG = {
   pending: { label: "Awaiting Review", icon: Clock, className: "bg-amber-50 text-amber-700 border-amber-200" },
   approved: { label: "Approved", icon: CheckCheck, className: "bg-green-50 text-green-700 border-green-200" },
   denied: { label: "Needs Revision", icon: XCircle, className: "bg-red-50 text-red-700 border-red-200" },
+};
+
+const ARCHETYPE_INFO: Record<string, {
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  careers: string[];
+}> = {
+  thinker: {
+    summary: "Thinkers are reflective, curious, and analytical. They like to understand how things work before taking action and often enjoy solving problems, researching ideas, and thinking deeply about decisions.",
+    strengths: [
+      "Strong critical thinking and problem-solving skills",
+      "Thoughtful and careful decision-making",
+      "Good at analyzing information and seeing patterns",
+      "Often independent and self-motivated learners",
+    ],
+    weaknesses: [
+      "May overthink or hesitate before acting",
+      "Can struggle with quick decisions",
+      "May seem quiet or less expressive in group settings",
+      "Sometimes spends too much time planning instead of doing",
+    ],
+    careers: ["Engineer", "Researcher", "Data analyst", "Software developer", "Scientist", "Architect", "Financial analyst"],
+  },
+  doer: {
+    summary: "Doers are action-oriented, energetic, and motivated by progress. They like to jump in, try things out, and learn through experience rather than spending too much time thinking about possibilities.",
+    strengths: [
+      "Takes initiative and gets things done",
+      "Learns well by doing and practicing",
+      "Adaptable and energetic",
+      "Often confident in taking action and solving immediate problems",
+    ],
+    weaknesses: [
+      "May act too quickly without enough planning",
+      "Can become impatient with slow processes",
+      "May overlook details",
+      "Sometimes needs help thinking through long-term consequences",
+    ],
+    careers: ["Entrepreneur", "Nurse", "Sales professional", "Skilled trades worker", "Event coordinator", "Emergency responder", "Project-based technical roles"],
+  },
+  helper: {
+    summary: "Helpers are caring, supportive, and people-centered. They are often motivated by relationships, teamwork, and making a positive difference in the lives of others.",
+    strengths: [
+      "Empathetic and supportive",
+      "Strong communication and listening skills",
+      "Good team players",
+      "Motivated by helping people succeed",
+      "Often dependable and encouraging",
+    ],
+    weaknesses: [
+      "May put others' needs before their own",
+      "Can struggle with boundaries",
+      "May avoid conflict or difficult decisions",
+      "Sometimes chooses paths based on pleasing others rather than personal goals",
+    ],
+    careers: ["Teacher", "Counselor", "Social worker", "Nurse", "Human resources specialist", "Community outreach coordinator", "Healthcare or service-oriented roles"],
+  },
+  planner: {
+    summary: "Planners are organized, responsible, and future-focused. They like structure, clear goals, and a sense of direction. They often feel most comfortable when they know what comes next and how to get there.",
+    strengths: [
+      "Organized and dependable",
+      "Strong at setting goals and following through",
+      "Good time management and preparation",
+      "Often responsible and detail-oriented",
+      "Can create structure for themselves and others",
+    ],
+    weaknesses: [
+      "May be uncomfortable with uncertainty or sudden change",
+      "Can become overly rigid or perfectionistic",
+      "May stress over mistakes or incomplete plans",
+      "Sometimes focuses so much on structure that flexibility becomes difficult",
+    ],
+    careers: ["Project manager", "Accountant", "Operations specialist", "Business administrator", "Logistician", "Teacher", "Healthcare administration or planning roles"],
+  },
 };
 
 function jitsiRoomName(appointmentId: number) {
@@ -307,6 +407,8 @@ export function StudentDashboardPage() {
   const { data: actionItems, isLoading: isItemsLoading } = useGetActionItems();
   const { data: appointments, isLoading: isAppointmentsLoading } = useGetAppointments();
   const { data: smartGoals = [], isLoading: isGoalsLoading } = useGetSmartGoals();
+  const { data: assessmentResults = [], isLoading: isAssessmentResultsLoading } = useGetAssessmentResults();
+  const [selectedAssessmentResult, setSelectedAssessmentResult] = useState<AssessmentResult | null>(null);
   const updateActionItem = useUpdateActionItem();
   const { data: peerSummary } = useGetPeerSummary();
   const sendNudge = useSendNudge();
@@ -362,6 +464,12 @@ export function StudentDashboardPage() {
 
   const isLoading = isSummaryLoading || isItemsLoading || isAppointmentsLoading;
 
+  const sortedAssessmentResults = useMemo(() => {
+    return [...assessmentResults].sort(
+      (a, b) => new Date(b.dateTaken).getTime() - new Date(a.dateTaken).getTime()
+    );
+  }, [assessmentResults]);
+
   const coachOptions = useMemo(() => {
     if (!appointments) return [];
     const seen = new Set<number>();
@@ -383,6 +491,18 @@ export function StudentDashboardPage() {
     return smartGoals.filter(g => g.status === goalsFilter);
   }, [smartGoals, goalsFilter]);
 
+  const triadCoach = useMemo(() => {
+    if (!appointments || appointments.length === 0) return null;
+
+    const firstWithCoach = appointments.find((a) => (a as any).coachName);
+    if (!firstWithCoach) return null;
+
+    return {
+      id: (firstWithCoach as any).coachId ?? null,
+      name: (firstWithCoach as any).coachName as string,
+    };
+  }, [appointments]);
+
   if (isLoading) {
     return (
       <MainLayout>
@@ -403,18 +523,6 @@ export function StudentDashboardPage() {
     approved: smartGoals.filter(g => g.status === "approved").length,
     denied: smartGoals.filter(g => g.status === "denied").length,
   };
-
-  const triadCoach = useMemo(() => {
-    if (!appointments || appointments.length === 0) return null;
-
-    const firstWithCoach = appointments.find((a) => (a as any).coachName);
-    if (!firstWithCoach) return null;
-
-    return {
-      id: (firstWithCoach as any).coachId ?? null,
-      name: (firstWithCoach as any).coachName as string,
-    };
-  }, [appointments]);
 
   return (
     <MainLayout>
@@ -700,6 +808,61 @@ export function StudentDashboardPage() {
                       {filteredGoals
                         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                         .map(goal => <GoalCard key={goal.id} goal={goal} />)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="shadow-sm border-none">
+                <CardHeader className="border-b bg-slate-50/50 pb-4">
+                  <CardTitle className="text-xl font-serif text-[#121c34] flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-[#3131d8]" />
+                    Assessment Results
+                  </CardTitle>
+                  <CardDescription>
+                    View your past assessment results and open the full breakdown
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="p-0">
+                  {isAssessmentResultsLoading ? (
+                    <div className="py-8 flex justify-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-[#3131d8]" />
+                    </div>
+                  ) : sortedAssessmentResults.length === 0 ? (
+                    <div className="p-8 text-center flex flex-col items-center">
+                      <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-400">
+                        <Activity className="w-6 h-6" />
+                      </div>
+                      <p className="text-[#121c34] font-medium">No assessment results yet</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Take your first assessment to see your results here.
+                      </p>
+                      <Link href="/assessment">
+                        <Button className="mt-4 bg-[#3131d8] hover:bg-[#3131d8]/90 text-white border-none">
+                          <Activity className="w-4 h-4 mr-2" />
+                          Take Assessment
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {sortedAssessmentResults.map((result) => (
+                        <button
+                          key={result.id}
+                          onClick={() => setSelectedAssessmentResult(result)}
+                          className="w-full p-4 text-left hover:bg-slate-50 transition-colors flex items-center justify-between gap-4"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-semibold text-[#121c34] capitalize truncate">
+                              The {result.innerHeroType}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Taken on {format(new Date(result.dateTaken), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        </button>
+                      ))}
                     </div>
                   )}
                 </CardContent>
@@ -998,6 +1161,153 @@ export function StudentDashboardPage() {
                 )}
               </div>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!selectedAssessmentResult}
+        onOpenChange={(open) => {
+          if (!open) setSelectedAssessmentResult(null);
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {selectedAssessmentResult && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-serif text-[#121c34] flex items-center gap-2">
+                  <History className="w-5 h-5 text-[#3131d8]" />
+                  Assessment Result
+                </DialogTitle>
+                <DialogDescription>
+                  Taken on {format(new Date(selectedAssessmentResult.dateTaken), "MMMM d, yyyy")}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6 pt-2">
+                <div className="text-center">
+                  <h2 className="text-4xl font-black capitalize text-transparent bg-clip-text bg-gradient-to-r from-[#121c34] to-[#3131d8]">
+                    The {selectedAssessmentResult.innerHeroType}
+                  </h2>
+                </div>
+
+                <Card className="border shadow-sm">
+                  <CardContent className="p-6">
+                    <p className="text-lg text-[#121c34] leading-relaxed text-center">
+                      {ARCHETYPE_INFO[selectedAssessmentResult.innerHeroType]?.summary}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card className="border shadow-sm">
+                    <CardContent className="p-6">
+                      <h3 className="font-bold text-lg text-[#121c34] mb-4 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-[#3131d8]" />
+                        Strengths
+                      </h3>
+                      <ul className="space-y-3">
+                        {ARCHETYPE_INFO[selectedAssessmentResult.innerHeroType]?.strengths.map((s, i) => (
+                          <li key={i} className="flex items-start gap-3 text-sm text-[#121c34]">
+                            <span className="mt-1.5 w-2 h-2 rounded-full bg-[#3131d8] flex-shrink-0" />
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border shadow-sm">
+                    <CardContent className="p-6">
+                      <h3 className="font-bold text-lg text-[#121c34] mb-4 flex items-center gap-2">
+                        <AlertCircle className="w-5 h-5 text-[#bb7e5d]" />
+                        Areas to Watch
+                      </h3>
+                      <ul className="space-y-3">
+                        {ARCHETYPE_INFO[selectedAssessmentResult.innerHeroType]?.weaknesses.map((w, i) => (
+                          <li key={i} className="flex items-start gap-3 text-sm text-[#121c34]">
+                            <span className="mt-1.5 w-2 h-2 rounded-full bg-[#bb7e5d] flex-shrink-0" />
+                            {w}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border shadow-sm">
+                    <CardContent className="p-6">
+                      <h3 className="font-bold text-lg text-[#121c34] mb-4 flex items-center gap-2">
+                        <Briefcase className="w-5 h-5 text-[#607b7d]" />
+                        Career Paths
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {ARCHETYPE_INFO[selectedAssessmentResult.innerHeroType]?.careers.map((c, i) => (
+                          <span
+                            key={i}
+                            className="text-sm bg-[#607b7d]/10 text-[#121c34] px-3 py-1.5 rounded-full font-medium"
+                          >
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border shadow-sm">
+                    <CardContent className="p-6">
+                      <h3 className="font-bold text-lg text-[#121c34] mb-4">
+                        Score Breakdown
+                      </h3>
+                      <div className="space-y-4">
+                        {(
+                          [
+                            ["thinker", selectedAssessmentResult.thinkerScore],
+                            ["helper", selectedAssessmentResult.helperScore],
+                            ["planner", selectedAssessmentResult.plannerScore],
+                            ["doer", selectedAssessmentResult.doerScore],
+                          ] as [string, number][]
+                        )
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([type, score]) => (
+                            <div key={type}>
+                              <div className="flex justify-between mb-1.5">
+                                <span className="text-sm font-medium capitalize text-[#121c34]">
+                                  {type}
+                                </span>
+                                <span className="text-sm font-bold text-muted-foreground">
+                                  {score}%
+                                </span>
+                              </div>
+                              <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                                <div
+                                  className={
+                                    type === "thinker"
+                                      ? "h-full bg-[#3131d8]"
+                                      : type === "helper"
+                                        ? "h-full bg-[#607b7d]"
+                                        : type === "planner"
+                                          ? "h-full bg-[#dbb68f]"
+                                          : "h-full bg-[#bb7e5d]"
+                                  }
+                                  style={{ width: `${score}%` }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setSelectedAssessmentResult(null)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
