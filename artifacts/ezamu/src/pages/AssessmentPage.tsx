@@ -179,23 +179,23 @@ function ArchetypeResultPanel({ type, scores, showHeader = true }: {
             {(Object.entries(scores) as [string, number][])
               .sort((a, b) => b[1] - a[1])
               .map(([t, score]) => (
-              <div key={t}>
-                <div className="flex justify-between mb-1">
-                  <span className="text-xs font-medium capitalize text-[#121c34]">{t}</span>
-                  <span className="text-xs font-bold text-muted-foreground">{score}%</span>
+                <div key={t}>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-xs font-medium capitalize text-[#121c34]">{t}</span>
+                    <span className="text-xs font-bold text-muted-foreground">{score}%</span>
+                  </div>
+                  <Progress
+                    value={score}
+                    className="h-1.5"
+                    indicatorClassName={
+                      t === 'thinker' ? 'bg-[#3131d8]' :
+                        t === 'helper' ? 'bg-[#607b7d]' :
+                          t === 'planner' ? 'bg-[#dbb68f]' :
+                            'bg-[#bb7e5d]'
+                    }
+                  />
                 </div>
-                <Progress
-                  value={score}
-                  className="h-1.5"
-                  indicatorClassName={
-                    t === 'thinker' ? 'bg-[#3131d8]' :
-                    t === 'helper' ? 'bg-[#607b7d]' :
-                    t === 'planner' ? 'bg-[#dbb68f]' :
-                    'bg-[#bb7e5d]'
-                  }
-                />
-              </div>
-            ))}
+              ))}
           </div>
         </CardContent>
       </Card>
@@ -208,11 +208,13 @@ export function AssessmentPage() {
   const { data: user, isLoading: isUserLoading } = useGetMe();
   const { data: latestResult, isLoading: isLatestLoading } = useGetLatestAssessmentResult();
   const saveAssessment = useSaveAssessmentResult();
-  
+
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<number, any>>({});
   const [isFinished, setIsFinished] = useState(false);
   const [results, setResults] = useState<any>(null);
+
+  const [isRetaking, setIsRetaking] = useState(false);
 
   // For multi-select
   const [currentMultiSelection, setCurrentMultiSelection] = useState<number[]>([]);
@@ -301,7 +303,7 @@ export function AssessmentPage() {
 
   const moveRanking = (index: number, direction: 'up' | 'down') => {
     if ((direction === 'up' && index === 0) || (direction === 'down' && index === rankingOrder.length - 1)) return;
-    
+
     setRankingOrder(prev => {
       const newOrder = [...prev];
       const swapIndex = direction === 'up' ? index - 1 : index + 1;
@@ -325,7 +327,7 @@ export function AssessmentPage() {
 
   const finishAssessment = (finalAnswers: Record<number, any>) => {
     let scores = { thinker: 0, helper: 0, planner: 0, doer: 0 };
-    
+
     // Tally scores
     QUESTIONS.forEach(q => {
       const ans = finalAnswers[q.id];
@@ -360,7 +362,7 @@ export function AssessmentPage() {
 
     // Find winner
     const winner = Object.entries(normalized).reduce((a, b) => a[1] > b[1] ? a : b)[0] as SaveAssessmentBodyInnerHeroType;
-    
+
     const descriptions = {
       thinker: "You are driven by curiosity and understanding. You excel at problem-solving and seeing the big picture.",
       helper: "You are driven by empathy and connection. You excel at supporting others and building strong relationships.",
@@ -373,13 +375,13 @@ export function AssessmentPage() {
       scores: normalized,
       summary: descriptions[winner]
     });
-    
+
     setIsFinished(true);
   };
 
   const handleSaveToProfile = () => {
     if (!results) return;
-    
+
     saveAssessment.mutate({
       data: {
         innerHeroType: results.type,
@@ -392,6 +394,7 @@ export function AssessmentPage() {
     }, {
       onSuccess: () => {
         toast.success("Assessment saved to profile!");
+        setIsRetaking(false);
         setLocation("/dashboard");
       },
       onError: () => {
@@ -399,7 +402,171 @@ export function AssessmentPage() {
       }
     });
   };
+  const startRetake = () => {
+    setAnswers({});
+    setCurrentStep(0);
+    setCurrentMultiSelection([]);
+    setRankingOrder([0, 1, 2, 3]);
+    setResults(null);
+    setIsFinished(false);
+    setIsRetaking(true);
+  };
+  if (latestResult && !isRetaking && !isFinished) {
+    const latestScores = {
+      thinker: latestResult.thinkerScore,
+      helper: latestResult.helperScore,
+      planner: latestResult.plannerScore,
+      doer: latestResult.doerScore,
+    };
 
+    return (
+      <MainLayout>
+        <div className="flex-1 bg-slate-50 py-12 px-4">
+          <div className="container mx-auto max-w-6xl">
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#121c34] text-white mb-6 shadow-xl">
+                <History className="w-10 h-10" />
+              </div>
+              <h1 className="text-4xl font-serif font-bold text-[#121c34] mb-2">
+                Your Latest Assessment Result
+              </h1>
+              <h2 className="text-5xl font-black capitalize text-transparent bg-clip-text bg-gradient-to-r from-[#121c34] to-[#3131d8]">
+                The {latestResult.innerHeroType}
+              </h2>
+            </div>
+            <h3 className="text-lg font-semibold text-[#121c34] mb-2 text-center">
+              What this means for you
+            </h3>
+            <Card className="border-none shadow-lg mb-8">
+              <CardContent className="p-8 md:p-10">
+                <div className="space-y-8">
+                  <div className="max-w-4xl mx-auto text-center space-y-3">
+                    <p className="text-xl md:text-2xl font-medium text-[#121c34] leading-relaxed">
+                      {ARCHETYPE_INFO[latestResult.innerHeroType].summary}
+                    </p>
+
+                    <p className="text-sm text-muted-foreground">
+                      Taken on {new Date(latestResult.dateTaken).toLocaleDateString()}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Card className="border shadow-sm">
+                      <CardContent className="p-6">
+                        <h3 className="font-bold text-lg text-[#121c34] mb-4 flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-[#3131d8]" />
+                          Strengths
+                        </h3>
+                        <ul className="space-y-3">
+                          {ARCHETYPE_INFO[latestResult.innerHeroType].strengths.map((s, i) => (
+                            <li key={i} className="flex items-start gap-3 text-sm text-[#121c34]">
+                              <span className="mt-1.5 w-2 h-2 rounded-full bg-[#3131d8] flex-shrink-0" />
+                              {s}
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border shadow-sm">
+                      <CardContent className="p-6">
+                        <h3 className="font-bold text-lg text-[#121c34] mb-4 flex items-center gap-2">
+                          <AlertCircle className="w-5 h-5 text-[#bb7e5d]" />
+                          Areas to Watch
+                        </h3>
+                        <ul className="space-y-3">
+                          {ARCHETYPE_INFO[latestResult.innerHeroType].weaknesses.map((w, i) => (
+                            <li key={i} className="flex items-start gap-3 text-sm text-[#121c34]">
+                              <span className="mt-1.5 w-2 h-2 rounded-full bg-[#bb7e5d] flex-shrink-0" />
+                              {w}
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border shadow-sm">
+                      <CardContent className="p-6">
+                        <h3 className="font-bold text-lg text-[#121c34] mb-4 flex items-center gap-2">
+                          <Briefcase className="w-5 h-5 text-[#607b7d]" />
+                          Career Paths
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {ARCHETYPE_INFO[latestResult.innerHeroType].careers.map((c, i) => (
+                            <span
+                              key={i}
+                              className="text-sm bg-[#607b7d]/10 text-[#121c34] px-3 py-1.5 rounded-full font-medium"
+                            >
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border shadow-sm">
+                      <CardContent className="p-6">
+                        <h3 className="font-bold text-lg text-[#121c34] mb-4">
+                          Score Breakdown
+                        </h3>
+                        <div className="space-y-4">
+                          {(Object.entries(latestScores) as [string, number][])
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([type, score]) => (
+                              <div key={type}>
+                                <div className="flex justify-between mb-1.5">
+                                  <span className="text-sm font-medium capitalize text-[#121c34]">
+                                    {type}
+                                  </span>
+                                  <span className="text-sm font-bold text-muted-foreground">
+                                    {score}%
+                                  </span>
+                                </div>
+                                <Progress
+                                  value={score}
+                                  className="h-2"
+                                  indicatorClassName={
+                                    type === "thinker"
+                                      ? "bg-[#3131d8]"
+                                      : type === "helper"
+                                        ? "bg-[#607b7d]"
+                                        : type === "planner"
+                                          ? "bg-[#dbb68f]"
+                                          : "bg-[#bb7e5d]"
+                                  }
+                                />
+                              </div>
+                            ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="flex justify-center pt-2">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                      <Button
+                        onClick={startRetake}
+                        className="bg-[#121c34] hover:bg-[#121c34]/90 text-white"
+                      >
+                        Retake Assessment
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={() => setLocation("/dashboard")}
+                      >
+                        Back to Dashboard
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
   if (isFinished && results) {
     const info = ARCHETYPE_INFO[results.type];
     return (
@@ -427,23 +594,23 @@ export function AssessmentPage() {
                     {(Object.entries(results.scores) as [string, number][])
                       .sort((a, b) => b[1] - a[1])
                       .map(([type, score]) => (
-                      <div key={type}>
-                        <div className="flex justify-between mb-2">
-                          <span className="font-semibold text-lg capitalize text-[#121c34]">{type}</span>
-                          <span className="font-bold text-lg text-muted-foreground">{score}%</span>
+                        <div key={type}>
+                          <div className="flex justify-between mb-2">
+                            <span className="font-semibold text-lg capitalize text-[#121c34]">{type}</span>
+                            <span className="font-bold text-lg text-muted-foreground">{score}%</span>
+                          </div>
+                          <Progress
+                            value={score}
+                            className="h-3"
+                            indicatorClassName={
+                              type === 'thinker' ? 'bg-[#3131d8]' :
+                                type === 'helper' ? 'bg-[#607b7d]' :
+                                  type === 'planner' ? 'bg-[#dbb68f]' :
+                                    'bg-[#bb7e5d]'
+                            }
+                          />
                         </div>
-                        <Progress
-                          value={score}
-                          className="h-3"
-                          indicatorClassName={
-                            type === 'thinker' ? 'bg-[#3131d8]' :
-                            type === 'helper' ? 'bg-[#607b7d]' :
-                            type === 'planner' ? 'bg-[#dbb68f]' :
-                            'bg-[#bb7e5d]'
-                          }
-                        />
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </CardContent>
               </Card>
@@ -559,13 +726,13 @@ export function AssessmentPage() {
           {/* Left sidebar — previous result */}
           {latestResult && previousScores && (
             <aside className="hidden lg:block w-72 flex-shrink-0">
-              <div className="sticky top-28">
+              {/* <div className="sticky top-28">
                 <div className="flex items-center gap-2 mb-4 text-muted-foreground">
                   <History className="w-4 h-4" />
                   <span className="text-xs font-semibold uppercase tracking-wider">Your Last Result</span>
                 </div>
                 <ArchetypeResultPanel type={latestResult.innerHeroType} scores={previousScores} />
-              </div>
+              </div> */}
             </aside>
           )}
 
@@ -589,15 +756,13 @@ export function AssessmentPage() {
                       <button
                         key={idx}
                         onClick={() => handleSingleSelect(idx)}
-                        className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 flex items-center gap-4 ${
-                          isSelected 
-                            ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.01]" 
-                            : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
-                        }`}
+                        className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 flex items-center gap-4 ${isSelected
+                          ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.01]"
+                          : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
+                          }`}
                       >
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                          isSelected ? "border-[#3131d8]" : "border-slate-300"
-                        }`}>
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "border-[#3131d8]" : "border-slate-300"
+                          }`}>
                           {isSelected && <div className="w-3 h-3 rounded-full bg-[#3131d8]" />}
                         </div>
                         <span className="text-lg font-medium text-[#121c34]">{opt.text}</span>
@@ -615,11 +780,10 @@ export function AssessmentPage() {
                       <button
                         key={idx}
                         onClick={() => handleSingleSelect(idx)}
-                        className={`w-full text-left p-8 rounded-3xl border-2 transition-all duration-200 flex flex-col items-center justify-center text-center gap-4 h-48 ${
-                          isSelected 
-                            ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.02]" 
-                            : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
-                        }`}
+                        className={`w-full text-left p-8 rounded-3xl border-2 transition-all duration-200 flex flex-col items-center justify-center text-center gap-4 h-48 ${isSelected
+                          ? "border-[#3131d8] bg-[#3131d8]/5 shadow-md scale-[1.02]"
+                          : "border-slate-200 hover:border-[#3131d8]/40 hover:bg-slate-50"
+                          }`}
                       >
                         <span className="text-xl font-medium text-[#121c34] leading-snug">{opt.text}</span>
                       </button>
@@ -634,23 +798,21 @@ export function AssessmentPage() {
                     {question.options.map((opt, idx) => {
                       const isSelected = currentMultiSelection.includes(idx);
                       const isDisabled = !isSelected && currentMultiSelection.length >= (question.maxSelections || 2);
-                      
+
                       return (
                         <button
                           key={idx}
                           onClick={() => handleMultiSelect(idx)}
                           disabled={isDisabled}
-                          className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 flex items-center gap-4 ${
-                            isSelected 
-                              ? "border-[#607b7d] bg-[#607b7d]/5 shadow-md" 
-                              : isDisabled 
-                                ? "border-slate-100 opacity-50 cursor-not-allowed" 
-                                : "border-slate-200 hover:border-[#607b7d]/40 hover:bg-slate-50"
-                          }`}
+                          className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 flex items-center gap-4 ${isSelected
+                            ? "border-[#607b7d] bg-[#607b7d]/5 shadow-md"
+                            : isDisabled
+                              ? "border-slate-100 opacity-50 cursor-not-allowed"
+                              : "border-slate-200 hover:border-[#607b7d]/40 hover:bg-slate-50"
+                            }`}
                         >
-                          <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                            isSelected ? "border-[#607b7d] bg-[#607b7d]" : "border-slate-300"
-                          }`}>
+                          <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "border-[#607b7d] bg-[#607b7d]" : "border-slate-300"
+                            }`}>
                             {isSelected && <CheckCircleIcon className="w-4 h-4 text-white" />}
                           </div>
                           <span className="text-lg font-medium text-[#121c34]">{opt.text}</span>
@@ -658,8 +820,8 @@ export function AssessmentPage() {
                       );
                     })}
                   </div>
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     className="w-full h-14 text-lg bg-[#121c34] hover:bg-[#121c34]/90 rounded-xl"
                     onClick={submitMultiSelect}
                     disabled={currentMultiSelection.length !== question.maxSelections}
@@ -675,19 +837,19 @@ export function AssessmentPage() {
                     {rankingOrder.map((originalIndex, currentRank) => {
                       const opt = question.options[originalIndex];
                       return (
-                        <div 
+                        <div
                           key={originalIndex}
                           className="flex items-center p-4 rounded-xl border-2 border-slate-200 bg-white shadow-sm"
                         >
                           <div className="flex flex-col gap-1 mr-4">
-                            <button 
+                            <button
                               onClick={() => moveRanking(currentRank, 'up')}
                               disabled={currentRank === 0}
                               className="p-1 text-slate-400 hover:text-[#121c34] disabled:opacity-30 transition-colors"
                             >
                               <ArrowUp className="w-5 h-5" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => moveRanking(currentRank, 'down')}
                               disabled={currentRank === rankingOrder.length - 1}
                               className="p-1 text-slate-400 hover:text-[#121c34] disabled:opacity-30 transition-colors"
@@ -708,8 +870,8 @@ export function AssessmentPage() {
                       );
                     })}
                   </div>
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     className="w-full h-14 text-lg bg-[#dbb68f] text-[#121c34] hover:bg-[#dbb68f]/90 rounded-xl font-bold"
                     onClick={submitRanking}
                   >

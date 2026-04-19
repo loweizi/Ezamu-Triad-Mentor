@@ -404,6 +404,18 @@ export function StudentDashboardPage() {
     denied: smartGoals.filter(g => g.status === "denied").length,
   };
 
+  const triadCoach = useMemo(() => {
+    if (!appointments || appointments.length === 0) return null;
+
+    const firstWithCoach = appointments.find((a) => (a as any).coachName);
+    if (!firstWithCoach) return null;
+
+    return {
+      id: (firstWithCoach as any).coachId ?? null,
+      name: (firstWithCoach as any).coachName as string,
+    };
+  }, [appointments]);
+
   return (
     <MainLayout>
       <div className="flex-1 bg-slate-50 pb-12">
@@ -632,16 +644,15 @@ export function StudentDashboardPage() {
                         <button
                           key={status}
                           onClick={() => setGoalsFilter(status)}
-                          className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
-                            goalsFilter === status
-                              ? "bg-[#121c34] text-white border-[#121c34]"
-                              : "bg-white text-[#121c34]/60 border-slate-200 hover:border-[#121c34]/40"
-                          }`}
+                          className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${goalsFilter === status
+                            ? "bg-[#121c34] text-white border-[#121c34]"
+                            : "bg-white text-[#121c34]/60 border-slate-200 hover:border-[#121c34]/40"
+                            }`}
                         >
                           {status === "all" ? `All (${smartGoals.length})` :
-                           status === "pending" ? `Awaiting Review (${goalCounts.pending})` :
-                           status === "approved" ? `Approved (${goalCounts.approved})` :
-                           `Needs Revision (${goalCounts.denied})`}
+                            status === "pending" ? `Awaiting Review (${goalCounts.pending})` :
+                              status === "approved" ? `Approved (${goalCounts.approved})` :
+                                `Needs Revision (${goalCounts.denied})`}
                         </button>
                       ))}
                     </div>
@@ -754,110 +765,82 @@ export function StudentDashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Accountability Partner */}
-              {peerSummary && (
+              {/* Triad Team */}
+              {(peerSummary || triadCoach) && (
                 <Card className="shadow-sm border-none">
                   <CardHeader className="border-b bg-slate-50/50 pb-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg font-serif text-[#121c34] flex items-center gap-2">
-                          <Users className="w-4 h-4 text-[#3131d8]" />
-                          Accountability Partner
-                        </CardTitle>
-                        <CardDescription className="mt-0.5">
-                          Keep {peerSummary.peer.firstName} on track
-                        </CardDescription>
-                      </div>
-                      <button
-                        onClick={() => handleNudge()}
-                        disabled={sendNudge.isPending || nudgedAll}
-                        className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
-                          nudgedAll
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : "bg-[#dbb68f]/20 text-[#bb7e5d] border-[#dbb68f]/40 hover:bg-[#dbb68f]/30"
-                        }`}
-                        title={`Send a general nudge to ${peerSummary.peer.firstName}`}
-                      >
-                        <Bell className="w-3.5 h-3.5" />
-                        {nudgedAll ? "Nudged!" : "Nudge All"}
-                      </button>
+                    <div>
+                      <CardTitle className="text-lg font-serif text-[#121c34] flex items-center gap-2">
+                        <Users className="w-4 h-4 text-[#3131d8]" />
+                        Your Triad
+                      </CardTitle>
+                      <CardDescription className="mt-0.5">
+                        Your assigned coach and peer
+                      </CardDescription>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-4 pb-3 space-y-4">
-                    {/* Peer identity */}
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
-                        <AvatarImage src={peerSummary.peer.profilePicUrl ?? undefined} />
-                        <AvatarFallback className="bg-[#121c34] text-white text-sm font-semibold">
-                          {peerSummary.peer.firstName[0]}{peerSummary.peer.lastName[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold text-[#121c34] text-sm">
-                          {peerSummary.peer.firstName} {peerSummary.peer.lastName}
+
+                  <CardContent className="pt-4 pb-4 space-y-4">
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="rounded-xl border bg-slate-50/50 p-4">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Coach
                         </p>
-                        {peerSummary.peer.innerHeroArchetype && (
-                          <p className="text-xs text-muted-foreground capitalize">{peerSummary.peer.innerHeroArchetype}</p>
+
+                        {triadCoach ? (
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
+                              <AvatarFallback className="bg-[#607b7d] text-white text-sm font-semibold">
+                                {triadCoach.name.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-semibold text-[#121c34] text-sm">
+                                {triadCoach.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Assigned coach
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No coach assigned yet.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="rounded-xl border bg-slate-50/50 p-4">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Peer
+                        </p>
+
+                        {peerSummary ? (
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
+                              <AvatarImage src={peerSummary.peer.profilePicUrl ?? undefined} />
+                              <AvatarFallback className="bg-[#121c34] text-white text-sm font-semibold">
+                                {peerSummary.peer.firstName[0]}{peerSummary.peer.lastName[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-semibold text-[#121c34] text-sm">
+                                {peerSummary.peer.firstName} {peerSummary.peer.lastName}
+                              </p>
+                              {peerSummary.peer.innerHeroArchetype && (
+                                <p className="text-xs text-muted-foreground capitalize">
+                                  {peerSummary.peer.innerHeroArchetype}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No peer assigned yet.
+                          </p>
                         )}
                       </div>
                     </div>
-
-                    {/* Action items */}
-                    {peerSummary.actionItems.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2">
-                          Action Plan
-                          <span className="ml-1.5 text-muted-foreground font-normal normal-case">
-                            ({peerSummary.actionItems.filter(i => i.completed).length}/{peerSummary.actionItems.length} done)
-                          </span>
-                        </p>
-                        <div className="space-y-1.5">
-                          {peerSummary.actionItems.slice(0, 5).map(item => (
-                            <PeerTaskRow
-                              key={item.id}
-                              item={item}
-                              nudged={nudgedIds.has(item.id)}
-                              isSending={sendNudge.isPending}
-                              onNudge={() => handleNudge(item.title, item.id)}
-                            />
-                          ))}
-                          {peerSummary.actionItems.length > 5 && (
-                            <p className="text-xs text-muted-foreground pl-1">
-                              +{peerSummary.actionItems.length - 5} more tasks
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Smart goals summary */}
-                    {peerSummary.smartGoals.length > 0 && (
-                      <div className="pt-3 border-t">
-                        <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2">SMART Goals</p>
-                        <div className="flex gap-2 flex-wrap">
-                          {(["approved", "pending", "denied"] as const).map(status => {
-                            const count = peerSummary.smartGoals.filter(g => g.status === status).length;
-                            if (!count) return null;
-                            const cfg = {
-                              approved: "bg-green-50 text-green-700 border-green-200",
-                              pending: "bg-amber-50 text-amber-700 border-amber-200",
-                              denied: "bg-red-50 text-red-700 border-red-200",
-                            }[status];
-                            return (
-                              <span key={status} className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cfg}`}>
-                                {count} {status}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {peerSummary.actionItems.length === 0 && peerSummary.smartGoals.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-3">
-                        {peerSummary.peer.firstName} hasn't started their plan yet.
-                      </p>
-                    )}
                   </CardContent>
                 </Card>
               )}
@@ -904,12 +887,12 @@ export function StudentDashboardPage() {
                         const pct = total > 0 ? Math.round((done / total) * 100) : 0;
                         const barColor =
                           goal.status === "approved" ? "bg-[#3131d8]"
-                          : goal.status === "denied" ? "bg-red-400"
-                          : "bg-amber-400";
+                            : goal.status === "denied" ? "bg-red-400"
+                              : "bg-amber-400";
                         const statusBadge =
                           goal.status === "approved" ? "text-green-700 bg-green-50 border-green-200"
-                          : goal.status === "denied" ? "text-red-700 bg-red-50 border-red-200"
-                          : "text-amber-700 bg-amber-50 border-amber-200";
+                            : goal.status === "denied" ? "text-red-700 bg-red-50 border-red-200"
+                              : "text-amber-700 bg-amber-50 border-amber-200";
 
                         return (
                           <div key={goal.id}>
@@ -1030,9 +1013,8 @@ function PeerTaskRow({ item, nudged, isSending, onNudge }: {
 }) {
   return (
     <div className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors ${item.completed ? "opacity-50" : "hover:bg-slate-50"}`}>
-      <div className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${
-        item.completed ? "bg-green-500 border-green-500" : "border-slate-300"
-      }`}>
+      <div className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${item.completed ? "bg-green-500 border-green-500" : "border-slate-300"
+        }`}>
         {item.completed && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
       </div>
       <p className={`flex-1 text-xs min-w-0 truncate ${item.completed ? "line-through text-muted-foreground" : "text-[#121c34]"}`}>
@@ -1043,11 +1025,10 @@ function PeerTaskRow({ item, nudged, isSending, onNudge }: {
           onClick={onNudge}
           disabled={isSending || nudged}
           title="Send a nudge for this task"
-          className={`flex-shrink-0 flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-all ${
-            nudged
-              ? "bg-green-50 text-green-700 border-green-200"
-              : "bg-[#3131d8]/5 text-[#3131d8] border-[#3131d8]/20 hover:bg-[#3131d8]/10"
-          }`}
+          className={`flex-shrink-0 flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-all ${nudged
+            ? "bg-green-50 text-green-700 border-green-200"
+            : "bg-[#3131d8]/5 text-[#3131d8] border-[#3131d8]/20 hover:bg-[#3131d8]/10"
+            }`}
         >
           <Bell className="w-2.5 h-2.5" />
           {nudged ? "Sent" : "Nudge"}
