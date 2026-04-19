@@ -53,6 +53,52 @@ Ezamu is a full-stack triad mentorship web platform connecting students with coa
 - `/chat` — Messaging
 - `/contact` — Contact page (public)
 
+## File Navigation
+
+artifacts/ — contains the app projects
+	api-server/ — backend service
+		src/ — backend source code
+			lib/ — shared backend utilities
+middlewares/ — request/auth middleware
+routes/ — API route handlers
+app.ts — app setup
+index.ts — server entry point
+.env.example — sample environment variables
+build.mjs — build script
+package.json
+tsconfig.json
+ezamu/ — frontend app
+	.replit-artifact
+public/ — static assets
+src/ — main frontend code
+	components/ — reusable UI pieces
+hooks/ — custom React hooks
+lib/ — shared frontend utilities
+pages/ — page-level views
+App.tsx — main app component
+index.css — global styles
+main.tsx — frontend entry point
+.env.example
+components.json
+index.html
+package.json
+tsconfig.json
+vercel.json
+vite.config.ts
+lib/ — shared library code
+scripts/ — utility or setup scripts
+.gitignore
+.node-version
+.npmrc
+README.md
+package.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+railway.json
+tsconfig.base.json
+tsconfig.json
+
+
 ## Design
 
 - **Background gradient**: `linear-gradient(180deg, #121c34 0%, #3131d8 40%, #add8e6 100%)`
