@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Compass, CalendarDays, BookOpenCheck, Users } from "lucide-react";
+import { Compass, CalendarDays, BookOpenCheck, Users, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-type SupportedRole = "student" | "coach";
+type SupportedRole = "student" | "coach" | "peer";
 
 type WelcomeGettingStartedDialogProps = {
   role: SupportedRole;
@@ -24,13 +24,18 @@ export function queueGettingStartedModal() {
   localStorage.setItem(STORAGE_KEY, "true");
 }
 
-export function WelcomeGettingStartedDialog({ role, firstName }: WelcomeGettingStartedDialogProps) {
+export function WelcomeGettingStartedDialog({
+  role,
+  firstName,
+}: WelcomeGettingStartedDialogProps) {
   const [, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const shouldOpen = localStorage.getItem(STORAGE_KEY) === "true";
-    if (shouldOpen) {
+    const shouldShowGettingStarted =
+      localStorage.getItem(STORAGE_KEY) === "true" && role !== "peer";
+
+    if (shouldShowGettingStarted) {
       setOpen(true);
     }
   }, []);
@@ -51,9 +56,32 @@ export function WelcomeGettingStartedDialog({ role, firstName }: WelcomeGettingS
             ctaPath: "/availability",
           },
           {
-            icon: BookOpenCheck,
-            title: "Build your profile",
-            body: "Keep your profile and expertise areas up to date so students can quickly see how you can help.",
+            icon: Users,
+            title: "Manage your students and peers",
+            body: "Use your dashboard to review your students and assign available peers to the right student triads.",
+            ctaLabel: "Open Dashboard",
+            ctaPath: "/dashboard",
+          },
+        ],
+      };
+    }
+
+    if (role === "peer") {
+      return {
+        title: "Getting Started",
+        description: `Welcome ${name}! Your peer account is now set up.`,
+        steps: [
+          {
+            icon: Clock,
+            title: "Wait for assignment",
+            body: "A coach will pair you with a student once they are ready to place you in a triad.",
+            ctaLabel: "Go to Peer Dashboard",
+            ctaPath: "/peer-dashboard",
+          },
+          {
+            icon: Compass,
+            title: "Complete your profile",
+            body: "Keep your profile up to date so coaches and students know who you are when you are assigned.",
             ctaLabel: "Open Profile",
             ctaPath: "/profile",
           },
@@ -63,21 +91,21 @@ export function WelcomeGettingStartedDialog({ role, firstName }: WelcomeGettingS
 
     return {
       title: "Getting Started",
-      description: `Welcome ${name}! To get started, we recommend taking the assessment first so Ezamu can better personalize your path.`,
+      description: `Welcome ${name}! We recommend starting with your assessment so your experience can be tailored to your goals.`,
       steps: [
         {
-          icon: Compass,
-          title: "Take the assessment",
-          body: "Open the Assessment tab at the top first to discover your Inner Hero and get more relevant guidance.",
+          icon: BookOpenCheck,
+          title: "Take your assessment",
+          body: "Start with the assessment so Ezamu can better understand your interests, needs, and goals.",
           ctaLabel: "Go to Assessment",
           ctaPath: "/assessment",
         },
         {
-          icon: Users,
-          title: "Explore your support network",
-          body: "Browse coaches under Appointments and peers under Peers to start building support around your goals.",
-          ctaLabel: "View Appointments",
-          ctaPath: "/appointments",
+          icon: Compass,
+          title: "Explore coaches",
+          body: "Browse available coaches, book a session, and begin building your plan.",
+          ctaLabel: "View Coaches",
+          ctaPath: "/coaches",
         },
       ],
     };
@@ -85,6 +113,8 @@ export function WelcomeGettingStartedDialog({ role, firstName }: WelcomeGettingS
 
   const closeDialog = () => {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem("ezamu_show_role_select");
+    localStorage.removeItem("ezamu_dashboard_mode");
     setOpen(false);
   };
 
@@ -104,7 +134,9 @@ export function WelcomeGettingStartedDialog({ role, firstName }: WelcomeGettingS
       <DialogContent className="max-w-2xl border-none p-0 overflow-hidden">
         <div className="bg-gradient-to-r from-[#121c34] to-[#3131d8] px-6 py-5 text-white">
           <DialogHeader className="space-y-2 text-left">
-            <DialogTitle className="text-2xl font-serif text-white">{content.title}</DialogTitle>
+            <DialogTitle className="text-2xl font-serif text-white">
+              {content.title}
+            </DialogTitle>
             <DialogDescription className="text-white/80 text-base leading-relaxed">
               {content.description}
             </DialogDescription>
@@ -115,7 +147,10 @@ export function WelcomeGettingStartedDialog({ role, firstName }: WelcomeGettingS
           {content.steps.map((step, index) => {
             const Icon = step.icon;
             return (
-              <div key={step.title} className="rounded-2xl border border-slate-200 p-5 shadow-sm bg-slate-50/60">
+              <div
+                key={step.title}
+                className="rounded-2xl border border-slate-200 p-5 shadow-sm bg-slate-50/60"
+              >
                 <div className="flex items-start gap-4">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#3131d8]/10 text-[#3131d8] shrink-0">
                     <Icon className="h-5 w-5" />
@@ -125,9 +160,13 @@ export function WelcomeGettingStartedDialog({ role, firstName }: WelcomeGettingS
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#121c34] text-xs font-bold text-white">
                         {index + 1}
                       </span>
-                      <h3 className="text-base font-semibold text-[#121c34]">{step.title}</h3>
+                      <h3 className="text-base font-semibold text-[#121c34]">
+                        {step.title}
+                      </h3>
                     </div>
-                    <p className="text-sm text-slate-600 leading-relaxed mb-4">{step.body}</p>
+                    <p className="text-sm text-slate-600 leading-relaxed mb-4">
+                      {step.body}
+                    </p>
                     <Button
                       type="button"
                       variant="outline"
@@ -144,7 +183,11 @@ export function WelcomeGettingStartedDialog({ role, firstName }: WelcomeGettingS
         </div>
 
         <DialogFooter className="px-6 pb-6 pt-0 bg-white">
-          <Button type="button" className="bg-[#121c34] hover:bg-[#121c34]/90" onClick={closeDialog}>
+          <Button
+            type="button"
+            className="bg-[#121c34] hover:bg-[#121c34]/90 text-white"
+            onClick={closeDialog}
+          >
             Got it
           </Button>
         </DialogFooter>

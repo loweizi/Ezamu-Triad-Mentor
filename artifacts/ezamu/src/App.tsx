@@ -24,6 +24,8 @@ import { CoachStudentDetailPage } from "@/pages/CoachStudentDetailPage";
 import { AvailabilityPage } from "@/pages/AvailabilityPage";
 import { PeersPage } from "@/pages/PeersPage";
 import { GuardianPage } from "@/pages/GuardianPage";
+import { PeerDashboardPage } from "@/pages/PeerDashboardPage";
+import { useGetMe } from "@workspace/api-client-react";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -82,16 +84,30 @@ function ClerkApiAuthBridge() {
 }
 
 function HomeRedirect() {
-  return (
-    <>
-      <Show when="signed-in">
-        <Redirect to="/dashboard" />
-      </Show>
-      <Show when="signed-out">
-        <Home />
-      </Show>
-    </>
-  );
+  const { isLoaded, isSignedIn } = useAuth();
+  const { data: user, isLoading } = useGetMe();
+
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (!isSignedIn) {
+    return <Home />;
+  }
+
+  if (isLoading || !user) {
+    return null;
+  }
+
+  if ((user.role as string) === "peer") {
+    return <Redirect to="/peer-dashboard" />;
+  }
+
+  if ((user.role as string) === "guardian") {
+    return <Redirect to="/guardian" />;
+  }
+
+  return <Redirect to="/dashboard" />;
 }
 
 // Protected Route wrapper component
@@ -127,7 +143,7 @@ function ClerkProviderWithRoutes() {
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
             <Route path="/contact" component={ContactPage} />
-            
+
             {/* Protected Routes */}
             <Route path="/onboarding">
               <ProtectedRoute component={OnboardingPage} />
@@ -165,7 +181,9 @@ function ClerkProviderWithRoutes() {
             <Route path="/guardian">
               <ProtectedRoute component={GuardianPage} />
             </Route>
-            
+            <Route path="/peer-dashboard">
+              <ProtectedRoute component={PeerDashboardPage} />
+            </Route>
             <Route component={NotFound} />
           </Switch>
         </TooltipProvider>

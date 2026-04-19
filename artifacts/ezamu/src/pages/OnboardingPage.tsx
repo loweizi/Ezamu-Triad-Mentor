@@ -30,14 +30,17 @@ export function OnboardingPage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { isLoaded, isSignedIn } = useAuth();
-  const { data: user, isLoading: isUserLoading } = useGetMe({
-    query: { enabled: isLoaded && isSignedIn === true },
-  });
+  const { data: user, isLoading: isUserLoading } = useGetMe();
   const onboardMutation = useOnboardUser();
 
-  const pendingRole = (localStorage.getItem("ezamu_pending_role") as "student" | "coach" | "guardian" | null)
-    ?? user?.role
-    ?? "student";
+  const pendingRole = (
+    localStorage.getItem("ezamu_pending_role") as
+    | "student"
+    | "peer"
+    | "coach"
+    | "guardian"
+    | null
+  ) ?? user?.role ?? "student";
   const pendingFirstName = localStorage.getItem("ezamu_pending_firstName") || user?.firstName || "";
   const pendingLastName = localStorage.getItem("ezamu_pending_lastName") || user?.lastName || "";
 
@@ -49,6 +52,7 @@ export function OnboardingPage() {
   const [age, setAge] = useState<string>("");
   const [bio, setBio] = useState("");
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  const isPeer = pendingRole === "peer";
 
   useEffect(() => {
     if (!user?.onboardingCompleted) {
@@ -64,11 +68,12 @@ export function OnboardingPage() {
   }, [user, setLocation]);
 
   useEffect(() => {
-    if (isUserLoading || !isGuardian || hasStartedGuardianAutoOnboarding.current || user?.onboardingCompleted) {
+    if (!isLoaded || !isSignedIn || isUserLoading || !isGuardian || hasStartedGuardianAutoOnboarding.current || user?.onboardingCompleted) {
       return;
     }
 
     hasStartedGuardianAutoOnboarding.current = true;
+
     onboardMutation.mutate(
       {
         data: {
@@ -94,6 +99,8 @@ export function OnboardingPage() {
       }
     );
   }, [
+    isLoaded,
+    isSignedIn,
     isUserLoading,
     isGuardian,
     user,
@@ -107,8 +114,8 @@ export function OnboardingPage() {
   const fieldOptions = isCoach ? COACH_EXPERTISE : STUDENT_INTERESTS;
 
   const handleFieldToggle = (field: string) => {
-    setSelectedFields(prev =>
-      prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+    setSelectedFields((prev) =>
+      prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field]
     );
   };
 
@@ -118,19 +125,26 @@ export function OnboardingPage() {
         toast.error("Please enter a valid age.");
         return;
       }
+
       if (isCoach && age && isNaN(Number(age))) {
         toast.error("Age must be a number.");
         return;
       }
     }
+
     if (step === 2 && selectedFields.length === 0) {
-      toast.error(isCoach ? "Please select at least one area of expertise." : "Please select at least one interest.");
+      toast.error(
+        isCoach
+          ? "Please select at least one area of expertise."
+          : "Please select at least one interest."
+      );
       return;
     }
-    setStep(prev => prev + 1);
+
+    setStep((prev) => prev + 1);
   };
 
-  const handleBack = () => setStep(prev => prev - 1);
+  const handleBack = () => setStep((prev) => prev - 1);
 
   const handleSubmit = () => {
     if (!bio.trim()) {
@@ -138,34 +152,35 @@ export function OnboardingPage() {
       return;
     }
 
-    const data: Record<string, unknown> = {
+    const data: Parameters<typeof onboardMutation.mutate>[0]["data"] = {
+      bio: bio.trim(),
       ...(pendingFirstName ? { firstName: pendingFirstName } : {}),
       ...(pendingLastName ? { lastName: pendingLastName } : {}),
-      bio,
-      ...(pendingRole ? { role: pendingRole } : {}),
+      ...(pendingRole ? { role: pendingRole as any } : {}),
+      ...(age && !isNaN(Number(age)) ? { age: Number(age) } : {}),
+      ...(isCoach
+        ? { fieldsOfExpertise: selectedFields }
+        : { fieldsOfInterest: selectedFields }),
     };
 
-    if (age && !isNaN(Number(age))) {
-      data.age = Number(age);
-    }
-
-    if (isCoach) {
-      data.fieldsOfExpertise = selectedFields;
-    } else {
-      data.fieldsOfInterest = selectedFields;
-    }
-
     onboardMutation.mutate(
-      { data: data as Parameters<typeof onboardMutation.mutate>[0]["data"] },
+      { data },
       {
         onSuccess: (updatedUser) => {
           queryClient.setQueryData(getGetMeQueryKey(), updatedUser);
           localStorage.removeItem("ezamu_pending_role");
           localStorage.removeItem("ezamu_pending_firstName");
           localStorage.removeItem("ezamu_pending_lastName");
-          queueGettingStartedModal();
           toast.success("Welcome to Ezamu!");
-          setLocation("/dashboard");
+
+          if (pendingRole === "peer") {
+            setLocation("/peer-dashboard");
+          } else if (pendingRole === "guardian") {
+            setLocation("/guardian");
+          } else {
+            queueGettingStartedModal();
+            setLocation("/dashboard");
+          }
         },
         onError: () => {
           toast.error("Failed to complete onboarding. Please try again.");
@@ -174,7 +189,7 @@ export function OnboardingPage() {
     );
   };
 
-  if (isUserLoading) {
+  if (isUserLoading || !isLoaded) {
     return (
       <MainLayout>
         <div className="flex-1 flex items-center justify-center">
@@ -203,15 +218,15 @@ export function OnboardingPage() {
 
   const stepDescriptions = isCoach
     ? [
-        "Just a few quick questions to personalise your coaching profile.",
-        "Select the areas you coach or specialise in.",
-        "Write a short bio so students can get to know you.",
-      ]
+      "Just a few quick questions to personalise your coaching profile.",
+      "Select the areas you coach or specialise in.",
+      "Write a short bio so students can get to know you.",
+    ]
     : [
-        "Just a few quick questions to personalise your experience.",
-        "Select the fields you're most interested in exploring.",
-        "Write a short bio so coaches can get to know you.",
-      ];
+      "Just a few quick questions to personalise your experience.",
+      "Select the fields you're most interested in exploring.",
+      "Write a short bio so coaches can get to know you.",
+    ];
 
   return (
     <MainLayout>
@@ -247,7 +262,11 @@ export function OnboardingPage() {
                 <div className="space-y-2">
                   <Label htmlFor="age">
                     How old are you?
-                    {isCoach && <span className="ml-1 text-muted-foreground text-xs font-normal">(optional)</span>}
+                    {isCoach && (
+                      <span className="ml-1 text-muted-foreground text-xs font-normal">
+                        (optional)
+                      </span>
+                    )}
                   </Label>
                   <Input
                     id="age"
@@ -263,27 +282,29 @@ export function OnboardingPage() {
 
             {step === 2 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {fieldOptions.map(field => {
+                {fieldOptions.map((field) => {
                   const selected = selectedFields.includes(field);
                   return (
                     <button
                       key={field}
                       type="button"
                       onClick={() => handleFieldToggle(field)}
-                      className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-colors w-full ${
-                        selected
-                          ? "border-[#3131d8] bg-[#3131d8]/5"
-                          : "border-slate-200 hover:border-[#3131d8]/30"
-                      }`}
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-colors w-full ${selected
+                        ? "border-[#3131d8] bg-[#3131d8]/5"
+                        : "border-slate-200 hover:border-[#3131d8]/30"
+                        }`}
                     >
-                      <div className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
-                        selected
+                      <div
+                        className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${selected
                           ? "bg-[#3131d8] border-[#3131d8]"
                           : "bg-white border-slate-300"
-                      }`}>
+                          }`}
+                      >
                         {selected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                       </div>
-                      <span className="flex-1 font-medium text-sm text-[#121c34]">{field}</span>
+                      <span className="flex-1 font-medium text-sm text-[#121c34]">
+                        {field}
+                      </span>
                     </button>
                   );
                 })}

@@ -21,10 +21,17 @@ import {
 import {
   ArrowLeft, Loader2, User, Calendar, Target, FileText,
   Check, X, ChevronDown, ChevronUp, Clock, BookOpen, Save,
-  ListChecks, Plus,
+  ListChecks, Plus, Users, UserMinus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const ARCHETYPE_LABELS: Record<string, string> = {
   hero: "The Hero",
@@ -198,6 +205,44 @@ export function CoachStudentDetailPage() {
   const [newItemTitle, setNewItemTitle] = useState("");
   const [newItemDescription, setNewItemDescription] = useState("");
   const [newItemGoalId, setNewItemGoalId] = useState<number | null>(null);
+  const [isRemovingPeer, setIsRemovingPeer] = useState(false);
+  const [removePeerDialogOpen, setRemovePeerDialogOpen] = useState(false);
+
+  const handleRemovePeer = async () => {
+    try {
+      setIsRemovingPeer(true);
+
+      const res = await fetch("/api/users/remove-peer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ studentId }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to remove peer");
+      }
+
+      toast({
+        title: "Peer removed",
+        description: "The peer has been removed from this triad and returned to idle.",
+      });
+
+      setRemovePeerDialogOpen(false);
+      window.location.reload();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to remove peer.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRemovingPeer(false);
+    }
+  };
 
   useEffect(() => {
     if (noteData?.content !== undefined) {
@@ -347,7 +392,107 @@ export function CoachStudentDetailPage() {
               </CardContent>
             </Card>
           </div>
+          <Card className="shadow-sm border-none">
+            <CardHeader className="border-b bg-slate-50/50 pb-4">
+              <CardTitle className="text-lg font-serif text-[#121c34] flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#3131d8]" />
+                Triad Team
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                View the current student, coach, and assigned peer for this triad.
+              </p>
+            </CardHeader>
 
+            <CardContent className="pt-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-xl border bg-slate-50/50 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Student
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={student.profilePicUrl || undefined} />
+                      <AvatarFallback className="bg-[#3131d8] text-white">
+                        {student.firstName.charAt(0)}{student.lastName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-[#121c34]">
+                        {student.firstName} {student.lastName}
+                      </p>
+                      {student.email && (
+                        <p className="text-xs text-muted-foreground">{student.email}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-slate-50/50 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Coach
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-[#607b7d] text-white">
+                        C
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-[#121c34]">You</p>
+                      <p className="text-xs text-muted-foreground">Assigned coach</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-slate-50/50 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Peer
+                  </p>
+
+                  {student.assignedPeer ? (
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={student.assignedPeer.profilePicUrl || undefined} />
+                        <AvatarFallback className="bg-[#121c34] text-white">
+                          {student.assignedPeer.firstName.charAt(0)}
+                          {student.assignedPeer.lastName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-[#121c34]">
+                          {student.assignedPeer.firstName} {student.assignedPeer.lastName}
+                        </p>
+                        {student.assignedPeer.email && (
+                          <p className="text-xs text-muted-foreground">
+                            {student.assignedPeer.email}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No peer is currently assigned.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {student.assignedPeer && (
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRemovePeerDialogOpen(true)}
+                    disabled={isRemovingPeer}
+                    className="border-red-300 text-red-600 hover:bg-red-50 flex items-center gap-1.5"
+                  >
+                    <UserMinus className="w-3.5 h-3.5" />
+                    Remove Peer
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
           {/* Student Info + Progress */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="shadow-sm border-none">
@@ -422,11 +567,10 @@ export function CoachStudentDetailPage() {
                           </p>
                         </div>
                         <Badge
-                          className={`text-xs capitalize border ${
-                            appt.status === "confirmed" ? "bg-green-100 text-green-700 border-green-200" :
+                          className={`text-xs capitalize border ${appt.status === "confirmed" ? "bg-green-100 text-green-700 border-green-200" :
                             appt.status === "cancelled" ? "bg-red-100 text-red-700 border-red-200" :
-                            "bg-amber-100 text-amber-700 border-amber-200"
-                          }`}
+                              "bg-amber-100 text-amber-700 border-amber-200"
+                            }`}
                           variant="outline"
                         >
                           {appt.status === "pending" ? "upcoming" : appt.status}
@@ -477,7 +621,7 @@ export function CoachStudentDetailPage() {
                       <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-2">Pending Review</p>
                       <div className="space-y-2">
                         {pendingGoals.map(goal => (
-                          <SmartGoalCard key={goal.id} goal={goal} onUpdate={() => {}} />
+                          <SmartGoalCard key={goal.id} goal={goal} onUpdate={() => { }} />
                         ))}
                       </div>
                     </div>
@@ -487,7 +631,7 @@ export function CoachStudentDetailPage() {
                       <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-2 mt-4">Approved</p>
                       <div className="space-y-2">
                         {approvedGoals.map(goal => (
-                          <SmartGoalCard key={goal.id} goal={goal} onUpdate={() => {}} />
+                          <SmartGoalCard key={goal.id} goal={goal} onUpdate={() => { }} />
                         ))}
                       </div>
                     </div>
@@ -497,7 +641,7 @@ export function CoachStudentDetailPage() {
                       <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2 mt-4">Denied</p>
                       <div className="space-y-2">
                         {deniedGoals.map(goal => (
-                          <SmartGoalCard key={goal.id} goal={goal} onUpdate={() => {}} />
+                          <SmartGoalCard key={goal.id} goal={goal} onUpdate={() => { }} />
                         ))}
                       </div>
                     </div>
@@ -658,6 +802,47 @@ export function CoachStudentDetailPage() {
           </Card>
         </div>
       </div>
+      <Dialog open={removePeerDialogOpen} onOpenChange={setRemovePeerDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#121c34]">
+              Remove assigned peer?
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="text-sm text-muted-foreground leading-relaxed">
+            Are you sure you want to remove this peer from the triad? The student will no longer have a peer assigned.
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={async () => {
+                await handleRemovePeer();
+                setRemovePeerDialogOpen(false);
+              }}
+              disabled={isRemovingPeer}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isRemovingPeer ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Removing...
+                </>
+              ) : (
+                "Yes, remove peer"
+              )}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => setRemovePeerDialogOpen(false)}
+              disabled={isRemovingPeer}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

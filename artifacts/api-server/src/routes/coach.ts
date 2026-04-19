@@ -64,7 +64,11 @@ router.get("/coach/students/:studentId", requireAuth, async (req, res): Promise<
   if (!coach) { res.status(404).json({ error: "User not found" }); return; }
   if (coach.role !== "coach") { res.status(403).json({ error: "Only coaches can access this endpoint" }); return; }
 
-  const studentId = parseInt(req.params.studentId, 10);
+  const rawStudentId = Array.isArray(req.params.studentId)
+    ? req.params.studentId[0]
+    : req.params.studentId;
+
+  const studentId = parseInt(rawStudentId, 10);
   if (isNaN(studentId)) { res.status(400).json({ error: "Invalid student ID" }); return; }
 
   const [student] = await db.select().from(usersTable).where(eq(usersTable.id, studentId));
@@ -77,6 +81,19 @@ router.get("/coach/students/:studentId", requireAuth, async (req, res): Promise<
   const assessmentResult = await db.select().from(assessmentResultsTable)
     .where(eq(assessmentResultsTable.studentId, studentId))
     .then(rows => rows[0] ?? null);
+
+  const assignedPeer = student.peerId
+    ? await db.select({
+      id: usersTable.id,
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      email: usersTable.email,
+      profilePicUrl: usersTable.profilePicUrl,
+    })
+      .from(usersTable)
+      .where(eq(usersTable.id, student.peerId))
+      .then(rows => rows[0] ?? null)
+    : null;
 
   const now = new Date();
   const upcoming = appointments
@@ -109,6 +126,7 @@ router.get("/coach/students/:studentId", requireAuth, async (req, res): Promise<
         scheduledAt: a.scheduledAt.toISOString(),
         status: a.status,
       })),
+    assignedPeer,
   });
 });
 

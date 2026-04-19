@@ -31,6 +31,13 @@ export interface CoachStudentDetail {
   nextAppointmentAt: string | null;
   assessmentResult: { archetype: string; completedAt: string | null } | null;
   appointments: { id: number; title: string; scheduledAt: string; status: string }[];
+  assignedPeer: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    profilePicUrl: string | null;
+  } | null;
 }
 
 export interface SmartGoal {

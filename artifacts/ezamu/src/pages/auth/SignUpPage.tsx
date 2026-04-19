@@ -3,29 +3,42 @@ import { SignUp } from "@clerk/react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GraduationCap, BookOpen, Heart } from "lucide-react";
+import { GraduationCap, BookOpen, Heart, Users } from "lucide-react";
 
-type Role = "student" | "coach" | "guardian";
+type Role = "student" | "peer" | "coach" | "guardian";
 
-const ROLES: { value: Role; label: string; description: string; icon: React.ReactNode; color: string }[] = [
+const ROLES: {
+  value: Role;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+}[] = [
   {
     value: "student",
-    label: "Student/Peers",
+    label: "Student",
     description: "I'm a student looking for guidance, coaching, and a plan for my future.",
     icon: <GraduationCap className="w-8 h-8" />,
     color: "from-[#3131d8] to-[#5b5be8]",
   },
   {
+    value: "peer",
+    label: "Peer",
+    description: "I'm here to support students alongside coaches and be part of a triad.",
+    icon: <Users className="w-8 h-8" />,
+    color: "from-[#4a6365] to-[#607b7d]",
+  },
+  {
     value: "coach",
     label: "Coach",
-    description: "I'm a mentor or counsellor who wants to guide students on their journey.",
+    description: "I'm a mentor or counsellor who wants to guide students.",
     icon: <BookOpen className="w-8 h-8" />,
     color: "from-[#121c34] to-[#2a3a6e]",
   },
   {
     value: "guardian",
     label: "Guardian",
-    description: "I'm a parent or guardian who wants to stay involved in my student's progress.",
+    description: "I'm a parent or guardian who wants to stay involved.",
     icon: <Heart className="w-8 h-8" />,
     color: "from-[#607b7d] to-[#4a6365]",
   },
@@ -149,11 +162,10 @@ export function SignUpPage() {
                 <button
                   key={role.value}
                   onClick={() => setSelectedRole(role.value)}
-                  className={`w-full flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-200 text-left ${
-                    isSelected
+                  className={`w-full flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-200 text-left ${isSelected
                       ? "border-white bg-white/15 shadow-lg scale-[1.01]"
                       : "border-white/25 bg-white/8 hover:bg-white/12 hover:border-white/50"
-                  }`}
+                    }`}
                 >
                   <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${role.color} flex items-center justify-center text-white flex-shrink-0 shadow-md`}>
                     {role.icon}

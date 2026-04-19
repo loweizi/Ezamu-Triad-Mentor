@@ -17,7 +17,7 @@ import { useGetMe, useGetDashboardSummary } from "@workspace/api-client-react";
 
 export function Navbar() {
   const { signOut } = useClerk();
-  const { user, isLoaded } = useUser();
+  const { user } = useUser();
   const { data: appUser } = useGetMe();
   const { data: dashboardSummary } = useGetDashboardSummary();
   const unreadCount = dashboardSummary?.unreadMessagesCount || 0;
@@ -47,10 +47,16 @@ export function Navbar() {
     const isActive = location === href || (href !== "/" && location.startsWith(href));
     return `text-lg transition-colors ${isActive ? "text-white font-bold" : "font-medium text-white/80 hover:text-white"}`;
   };
+
   const loginClass = isHome
     ? "text-sm font-medium text-[#121c34] hover:text-[#3131d8] transition-colors"
     : "text-sm font-medium text-white hover:text-white/80 transition-colors";
+
   const dividerClass = isHome ? "border-l border-[#121c34]/20" : "border-l border-white/20";
+
+  const isCoach = appUser?.role === "coach";
+  const isStudent = appUser?.role === "student";
+  const isPeer = (appUser?.role as string | undefined) === "peer";
 
   return (
     <nav className={navClass}>
@@ -59,7 +65,6 @@ export function Navbar() {
           <span className={`font-sans text-2xl font-bold tracking-tight ${logoTextClass}`}>Ezamu</span>
         </Link>
 
-        {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-6">
           <Show when="signed-out">
             <Link href="/assessment" className={linkClass}>
@@ -81,24 +86,32 @@ export function Navbar() {
           </Show>
 
           <Show when="signed-in">
-            <Link href="/dashboard" className={getNavLinkClass("/dashboard")}>
+            <Link
+              href={isPeer ? "/peer-dashboard" : isStudent ? "/dashboard" : "/dashboard"}
+              className={getNavLinkClass(isPeer ? "/peer-dashboard" : "/dashboard")}
+            >
               Dashboard
             </Link>
-            {appUser?.role === "coach" ? (
+
+            {isCoach ? (
               <Link href="/availability" className={getNavLinkClass("/availability", "flex items-center gap-1.5")}>
                 <CalendarDays className="w-4 h-4" />
                 My Availability
               </Link>
-            ) : appUser?.role === "student" ? (
+            ) : isStudent ? (
               <Link href="/assessment" className={getNavLinkClass("/assessment", "flex items-center gap-1.5")}>
                 <Activity className="w-4 h-4" />
                 Assessment
               </Link>
             ) : null}
-            <Link href="/appointments" className={getNavLinkClass("/appointments")}>
-              Coaches
-            </Link>
-            {appUser?.role === "student" && (
+
+            {(isStudent || isPeer) && (
+              <Link href="/appointments" className={getNavLinkClass("/appointments")}>
+                Coaches
+              </Link>
+            )}
+
+            {(isCoach) && (
               <Link href="/peers" className={getNavLinkClass("/peers", "flex items-center gap-1.5")}>
                 <Users className="w-4 h-4" />
                 Peers
@@ -106,7 +119,10 @@ export function Navbar() {
             )}
 
             <div className={`flex items-center gap-4 ml-4 pl-4 ${dividerClass}`}>
-              <Link href="/chat" className={`relative ${isHome ? "text-[#121c34]/70 hover:text-[#121c34] transition-colors" : "text-white/80 hover:text-white transition-colors"}`}>
+              <Link
+                href="/chat"
+                className={`relative ${isHome ? "text-[#121c34]/70 hover:text-[#121c34] transition-colors" : "text-white/80 hover:text-white transition-colors"}`}
+              >
                 <MessageCircle className="w-5 h-5" />
                 {unreadCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5 leading-none">
@@ -149,7 +165,6 @@ export function Navbar() {
           </Show>
         </div>
 
-        {/* Mobile Nav */}
         <div className="md:hidden flex items-center">
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
@@ -189,37 +204,78 @@ export function Navbar() {
                     </div>
                   </div>
 
-                  <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/dashboard")}>
+                  <Link
+                    href={isPeer ? "/peer-dashboard" : "/dashboard"}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={getMobileNavLinkClass(isPeer ? "/peer-dashboard" : "/dashboard")}
+                  >
                     Dashboard
                   </Link>
-                  {appUser?.role === "coach" ? (
-                    <Link href="/availability" onClick={() => setMobileMenuOpen(false)} className={`${getMobileNavLinkClass("/availability")} flex items-center gap-2`}>
+
+                  {isCoach ? (
+                    <Link
+                      href="/availability"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`${getMobileNavLinkClass("/availability")} flex items-center gap-2`}
+                    >
                       <CalendarDays className="w-5 h-5" />
                       My Availability
                     </Link>
-                  ) : appUser?.role === "student" ? (
-                    <Link href="/assessment" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/assessment")}>
+                  ) : isStudent ? (
+                    <Link
+                      href="/assessment"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={getMobileNavLinkClass("/assessment")}
+                    >
                       Assessment
                     </Link>
                   ) : null}
-                  <Link href="/appointments" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/appointments")}>
-                    Coaches
-                  </Link>
-                  {appUser?.role === "student" && (
-                    <Link href="/peers" onClick={() => setMobileMenuOpen(false)} className={`${getMobileNavLinkClass("/peers")} flex items-center gap-2`}>
+
+                  {(isStudent || isPeer) && (
+                    <Link
+                      href="/appointments"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={getMobileNavLinkClass("/appointments")}
+                    >
+                      Coaches
+                    </Link>
+                  )}
+
+                  {(isCoach) && (
+                    <Link
+                      href="/peers"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`${getMobileNavLinkClass("/peers")} flex items-center gap-2`}
+                    >
                       <Users className="w-5 h-5" />
                       Peers
                     </Link>
                   )}
-                  <Link href="/chat" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/chat")}>
+
+                  <Link
+                    href="/chat"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={getMobileNavLinkClass("/chat")}
+                  >
                     Messages
                   </Link>
-                  <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass("/profile")}>
+
+                  <Link
+                    href="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={getMobileNavLinkClass("/profile")}
+                  >
                     Profile
                   </Link>
 
                   <div className="h-px bg-white/10 my-2" />
-                  <button onClick={() => { signOut(); setMobileMenuOpen(false); }} className="text-left text-lg font-medium text-[#acedff] transition-colors flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      signOut();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="text-left text-lg font-medium text-[#acedff] transition-colors flex items-center gap-2"
+                  >
                     <LogOut className="w-5 h-5" />
                     Log out
                   </button>

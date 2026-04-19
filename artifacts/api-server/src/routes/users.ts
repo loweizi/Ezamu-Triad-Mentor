@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or } from "drizzle-orm";
+import { eq, ilike, or, isNotNull, and } from "drizzle-orm";
 import {
   actionItemsTable,
   appointmentsTable,
@@ -227,51 +227,92 @@ router.delete("/users/me", requireAuth, async (req, res): Promise<void> => {
       .delete(notificationsTable)
       .where(eq(notificationsTable.userId, user.id));
 
-    await tx
-      .delete(actionItemsTable)
-      .where(eq(actionItemsTable.studentId, user.id));
-    await tx
-      .delete(actionItemsTable)
-      .where(eq(actionItemsTable.coachId, user.id));
+    if (user.role === "coach") {
+      await tx
+        .delete(actionItemsTable)
+        .where(eq(actionItemsTable.coachId, user.id));
 
-    await tx
-      .delete(appointmentsTable)
-      .where(eq(appointmentsTable.studentId, user.id));
-    await tx
-      .delete(appointmentsTable)
-      .where(eq(appointmentsTable.coachId, user.id));
-    await tx
-      .delete(appointmentsTable)
-      .where(eq(appointmentsTable.peerId, user.id));
+      await tx
+        .delete(smartGoalsTable)
+        .where(eq(smartGoalsTable.coachId, user.id));
 
-    await tx
-      .delete(smartGoalsTable)
-      .where(eq(smartGoalsTable.studentId, user.id));
-    await tx
-      .delete(smartGoalsTable)
-      .where(eq(smartGoalsTable.coachId, user.id));
+      await tx
+        .delete(coachNotesTable)
+        .where(eq(coachNotesTable.coachId, user.id));
 
-    await tx
-      .delete(coachNotesTable)
-      .where(eq(coachNotesTable.studentId, user.id));
-    await tx
-      .delete(coachNotesTable)
-      .where(eq(coachNotesTable.coachId, user.id));
+      await tx
+        .delete(coachAvailabilityTable)
+        .where(eq(coachAvailabilityTable.coachId, user.id));
 
-    await tx
-      .delete(coachAvailabilityTable)
-      .where(eq(coachAvailabilityTable.coachId, user.id));
+      await tx
+        .delete(appointmentsTable)
+        .where(eq(appointmentsTable.coachId, user.id));
 
-    await tx
-      .delete(assessmentResultsTable)
-      .where(eq(assessmentResultsTable.studentId, user.id));
+      // Break triads: students lose coach + peer, peers go idle
+      await tx
+        .update(usersTable)
+        .set({ coachId: null, peerId: null })
+        .where(
+          and(
+            eq(usersTable.coachId, user.id),
+            eq(usersTable.role, "student"),
+          ),
+        );
 
-    await tx
-      .update(usersTable)
-      .set({ coachId: null, peerId: null })
-      .where(
-        or(eq(usersTable.coachId, user.id), eq(usersTable.peerId, user.id)),
-      );
+      await tx
+        .update(usersTable)
+        .set({ coachId: null })
+        .where(
+          and(
+            eq(usersTable.coachId, user.id),
+            eq(usersTable.role, "peer"),
+          ),
+        );
+    }
+
+    if (user.role === "student") {
+      await tx
+        .delete(actionItemsTable)
+        .where(eq(actionItemsTable.studentId, user.id));
+
+      await tx
+        .delete(smartGoalsTable)
+        .where(eq(smartGoalsTable.studentId, user.id));
+
+      await tx
+        .delete(coachNotesTable)
+        .where(eq(coachNotesTable.studentId, user.id));
+
+      await tx
+        .delete(assessmentResultsTable)
+        .where(eq(assessmentResultsTable.studentId, user.id));
+
+      await tx
+        .delete(appointmentsTable)
+        .where(eq(appointmentsTable.studentId, user.id));
+
+      // If this student had a peer, release that peer back to idle
+      if (user.peerId) {
+        await tx
+          .update(usersTable)
+          .set({ coachId: null })
+          .where(eq(usersTable.id, user.peerId));
+      }
+    }
+
+    if (user.role === "peer") {
+      // Student keeps coach, loses peer
+      await tx
+        .update(usersTable)
+        .set({ peerId: null })
+        .where(eq(usersTable.peerId, user.id));
+
+      // Existing coach-student appointments should remain, just remove peer from them
+      await tx
+        .update(appointmentsTable)
+        .set({ peerId: null })
+        .where(eq(appointmentsTable.peerId, user.id));
+    }
 
     await tx.delete(usersTable).where(eq(usersTable.id, user.id));
   });
@@ -303,6 +344,257 @@ router.get("/users/search", requireAuth, async (req, res): Promise<void> => {
     .limit(10);
 
   res.json(users.map((u) => SearchUsersResponseItem.parse(u)));
+});
+
+router.post("/users/assign-peer", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const coach = await getOrCreateUser(clerkId);
+
+  if (!coach || coach.role !== "coach") {
+    res.status(403).json({ error: "Only coaches can assign peers" });
+    return;
+  }
+
+  const { studentId, peerId } = req.body ?? {};
+
+  if (typeof studentId !== "number" || typeof peerId !== "number") {
+    res.status(400).json({ error: "studentId and peerId must be numbers" });
+    return;
+  }
+
+  const [student] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, studentId));
+
+  const [peer] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, peerId));
+
+  if (!student || student.role !== "student") {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
+
+  if (!peer || peer.role !== "peer") {
+    res.status(404).json({ error: "Peer not found" });
+    return;
+  }
+
+  // Block only if the student is already assigned to a different coach
+  if (student.coachId && student.coachId !== coach.id) {
+    res.status(403).json({ error: "This student belongs to another coach" });
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    // Remove this peer from any other student first
+    await tx
+      .update(usersTable)
+      .set({ peerId: null })
+      .where(eq(usersTable.peerId, peer.id));
+
+    // Claim student under this coach and assign peer
+    await tx
+      .update(usersTable)
+      .set({
+        coachId: coach.id,
+        peerId: peer.id,
+      })
+      .where(eq(usersTable.id, student.id));
+
+    // Mark peer as belonging under this coach
+    await tx
+      .update(usersTable)
+      .set({ coachId: coach.id })
+      .where(eq(usersTable.id, peer.id));
+  });
+
+  res.json({ message: "Peer assigned successfully" });
+});
+
+router.post("/users/remove-peer", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const coach = await getOrCreateUser(clerkId);
+
+  if (!coach || coach.role !== "coach") {
+    res.status(403).json({ error: "Only coaches can remove peers" });
+    return;
+  }
+
+  const { studentId } = req.body ?? {};
+
+  if (typeof studentId !== "number") {
+    res.status(400).json({ error: "studentId must be a number" });
+    return;
+  }
+
+  const [student] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, studentId));
+
+  if (!student || student.role !== "student") {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
+
+  if (student.coachId !== coach.id) {
+    res.status(403).json({ error: "You are not assigned to this student" });
+    return;
+  }
+
+  if (!student.peerId) {
+    res.status(400).json({ error: "This student does not have a peer assigned" });
+    return;
+  }
+
+  const peerId = student.peerId;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(usersTable)
+      .set({ peerId: null })
+      .where(eq(usersTable.id, student.id));
+
+    await tx
+      .update(usersTable)
+      .set({ coachId: null })
+      .where(eq(usersTable.id, peerId));
+
+    await tx
+      .update(appointmentsTable)
+      .set({ peerId: null })
+      .where(
+        and(
+          eq(appointmentsTable.studentId, student.id),
+          eq(appointmentsTable.peerId, peerId),
+        ),
+      );
+  });
+
+  res.json({ message: "Peer removed successfully" });
+});
+
+router.get("/users/available-peers", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const coach = await getOrCreateUser(clerkId);
+
+  if (!coach || coach.role !== "coach") {
+    res.status(403).json({ error: "Only coaches can view peers" });
+    return;
+  }
+
+  // Get all peers who are:
+  // - role = peer
+  // - finished onboarding
+  // - NOT currently assigned to any student
+  const peers = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.role, "peer"));
+
+  // Filter out assigned peers
+  const assignedPeerIds = await db
+    .select({ peerId: usersTable.peerId })
+    .from(usersTable)
+    .where(isNotNull(usersTable.peerId));
+
+  const assignedSet = new Set(
+    assignedPeerIds.map((p) => p.peerId).filter(Boolean)
+  );
+
+  const availablePeers = peers.filter(
+    (p) =>
+      p.onboardingCompleted &&
+      !assignedSet.has(p.id)
+  );
+
+  res.json(
+    availablePeers.map((p) => ({
+      id: p.id,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      name: `${p.firstName} ${p.lastName}`,
+      email: p.email,
+      profilePicUrl: p.profilePicUrl ?? null,
+      bio: p.bio ?? "",
+      age: p.age ?? null,
+      fieldsOfInterest: p.fieldsOfInterest ?? [],
+      fieldsOfExpertise: p.fieldsOfExpertise ?? [],
+    }))
+  );
+});
+
+router.get("/users/peer-dashboard", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const peer = await getOrCreateUser(clerkId);
+
+  if (!peer || peer.role !== "peer") {
+    res.status(403).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const [student] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.peerId, peer.id));
+
+  if (!student) {
+    res.json({ assigned: false });
+    return;
+  }
+
+  const [coach] = student.coachId
+    ? await db.select().from(usersTable).where(eq(usersTable.id, student.coachId))
+    : [null];
+
+  const tasks = await db
+    .select({
+      id: actionItemsTable.id,
+      title: actionItemsTable.title,
+      description: actionItemsTable.description,
+      completed: actionItemsTable.completed,
+    })
+    .from(actionItemsTable)
+    .where(eq(actionItemsTable.studentId, student.id));
+
+  const goals = await db
+    .select({
+      id: smartGoalsTable.id,
+      title: smartGoalsTable.title,
+      status: smartGoalsTable.status,
+    })
+    .from(smartGoalsTable)
+    .where(eq(smartGoalsTable.studentId, student.id));
+
+  const appointments = await db
+    .select()
+    .from(appointmentsTable)
+    .where(eq(appointmentsTable.studentId, student.id));
+
+  res.json({
+    assigned: true,
+    student: {
+      id: student.id,
+      name: `${student.firstName} ${student.lastName}`,
+      bio: student.bio ?? "",
+    },
+    tasks,
+    goals,
+    appointments: appointments.map((a) => ({
+      id: a.id,
+      title: a.title,
+      scheduledAt: a.scheduledAt.toISOString(),
+      coachName: coach ? `${coach.firstName} ${coach.lastName}` : null,
+    })),
+    triad: {
+      studentName: `${student.firstName} ${student.lastName}`,
+      coachName: coach ? `${coach.firstName} ${coach.lastName}` : null,
+      peerName: `${peer.firstName} ${peer.lastName}`,
+    },
+  });
 });
 
 export default router;
