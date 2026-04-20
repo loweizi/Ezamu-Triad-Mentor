@@ -320,7 +320,18 @@ router.get("/peer/summary", requireAuth, async (req, res): Promise<void> => {
       res.status(200).json(null);
       return;
     }
-
+    const [guardian] = me.guardianId
+      ? await db
+        .select({
+          id: usersTable.id,
+          firstName: usersTable.firstName,
+          lastName: usersTable.lastName,
+          profilePicUrl: usersTable.profilePicUrl,
+          email: usersTable.email,
+        })
+        .from(usersTable)
+        .where(eq(usersTable.id, me.guardianId))
+      : [null];
     const actionItems = await db
       .select()
       .from(actionItemsTable)
@@ -338,6 +349,15 @@ router.get("/peer/summary", requireAuth, async (req, res): Promise<void> => {
 
     res.json({
       peer,
+      guardian: guardian
+        ? {
+          id: guardian.id,
+          firstName: guardian.firstName,
+          lastName: guardian.lastName,
+          profilePicUrl: guardian.profilePicUrl,
+          email: guardian.email,
+        }
+        : null,
       actionItems: actionItems.map((i) => ({
         id: i.id,
         title: i.title,

@@ -37,7 +37,16 @@ const ARCHETYPE_LABELS: Record<string, string> = {
   helper: "The Helper",
   planner: "The Planner",
 };
+type GuardianTriad = {
+  studentName: string;
+  coachName: string;
+  peerName: string;
+  guardianName: string;
+};
 
+type GuardianStudentDetailWithTriad = {
+  triad?: GuardianTriad;
+};
 const LEGACY_STORAGE_KEY = "guardian.studentEmail";
 
 function getScopedStorageKey(clerkId: string) {
@@ -217,7 +226,7 @@ export function GuardianPage() {
       </MainLayout>
     );
   }
-
+  const studentDataWithTriad = studentData as (typeof studentData & GuardianStudentDetailWithTriad);
   return (
     <MainLayout>
       <div className="flex-1 bg-slate-50 pb-12">
@@ -289,7 +298,48 @@ export function GuardianPage() {
                   </CardContent>
                 </Card>
               </div>
+              <Card className="shadow-sm border-none">
+                <CardHeader className="border-b bg-slate-50/50 pb-4">
+                  <CardTitle className="text-lg font-serif text-[#121c34] flex items-center gap-2">
+                    <User className="w-5 h-5 text-[#3131d8]" />
+                    Triad Team
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    View the current student, coach, guardian, and assigned peer for this triad.
+                  </p>
+                </CardHeader>
 
+                <CardContent className="pt-5">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="rounded-xl border bg-slate-50/50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Student
+                      </p>
+                      <p className="font-medium text-[#121c34]">
+                        {studentDataWithTriad.triad?.studentName || "No student is connected"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border bg-slate-50/50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Coach
+                      </p>
+                      <p className="font-medium text-[#121c34]">
+                        {studentDataWithTriad.triad?.coachName || "No coach is connected"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border bg-slate-50/50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Peer
+                      </p>
+                      <p className="font-medium text-[#121c34]">
+                        {studentDataWithTriad.triad?.peerName || "No peer is connected"}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="shadow-sm border-none">
                   <CardHeader className="border-b bg-slate-50/50 pb-4">
@@ -407,13 +457,12 @@ export function GuardianPage() {
                             <p className="font-semibold text-[#121c34] text-sm">{goal.title}</p>
                             <Badge
                               variant="outline"
-                              className={`text-xs capitalize border ${
-                                goal.status === "approved"
-                                  ? "bg-green-100 text-green-700 border-green-200"
-                                  : goal.status === "denied"
+                              className={`text-xs capitalize border ${goal.status === "approved"
+                                ? "bg-green-100 text-green-700 border-green-200"
+                                : goal.status === "denied"
                                   ? "bg-red-100 text-red-700 border-red-200"
                                   : "bg-amber-100 text-amber-700 border-amber-200"
-                              }`}
+                                }`}
                             >
                               {goal.status}
                             </Badge>

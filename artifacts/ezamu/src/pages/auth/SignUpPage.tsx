@@ -31,7 +31,7 @@ const ROLES: {
   {
     value: "coach",
     label: "Coach",
-    description: "I'm a mentor or counsellor who wants to guide students.",
+    description: "I'm a mentor or counselor who wants to guide students.",
     icon: <BookOpen className="w-8 h-8" />,
     color: "from-[#121c34] to-[#2a3a6e]",
   },

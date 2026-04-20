@@ -55,6 +55,18 @@ const COACH_GUIDANCE: Record<string, string> = {
   planner: "When coaches know a student is a Planner, they can use structured goal setting, timelines, and measurable steps to keep them motivated. Planners often do well when expectations are clear. Coaches can also help them build flexibility, manage perfectionism, and stay resilient when plans change.",
 };
 
+type AssignedGuardian = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email?: string | null;
+  profilePicUrl?: string | null;
+};
+
+type StudentDetailWithGuardian = {
+  assignedGuardian?: AssignedGuardian | null;
+};
+
 function SmartGoalCard({ goal, onUpdate }: { goal: SmartGoal; onUpdate: (goalId: number, status: "approved" | "denied", feedback?: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [feedback, setFeedback] = useState(goal.coachFeedback || "");
@@ -308,7 +320,7 @@ export function CoachStudentDetailPage() {
       </MainLayout>
     );
   }
-
+  const studentWithGuardian = student as typeof student & StudentDetailWithGuardian;
   const pendingGoals = (goals || []).filter(g => g.status === "pending");
   const approvedGoals = (goals || []).filter(g => g.status === "approved");
   const deniedGoals = (goals || []).filter(g => g.status === "denied");
@@ -413,7 +425,8 @@ export function CoachStudentDetailPage() {
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={student.profilePicUrl || undefined} />
                       <AvatarFallback className="bg-[#3131d8] text-white">
-                        {student.firstName.charAt(0)}{student.lastName.charAt(0)}
+                        {student.firstName.charAt(0)}
+                        {student.lastName.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
@@ -429,19 +442,34 @@ export function CoachStudentDetailPage() {
 
                 <div className="rounded-xl border bg-slate-50/50 p-4">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Coach
+                    Guardian
                   </p>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-[#607b7d] text-white">
-                        C
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-[#121c34]">You</p>
-                      <p className="text-xs text-muted-foreground">Assigned coach</p>
+
+                  {studentWithGuardian.assignedGuardian ? (
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={studentWithGuardian.assignedGuardian.profilePicUrl || undefined} />
+                        <AvatarFallback className="bg-[#607b7d] text-white">
+                          {studentWithGuardian.assignedGuardian.firstName.charAt(0)}
+                          {studentWithGuardian.assignedGuardian.lastName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-[#121c34]">
+                          {studentWithGuardian.assignedGuardian.firstName} {studentWithGuardian.assignedGuardian.lastName}
+                        </p>
+                        {studentWithGuardian.assignedGuardian.email && (
+                          <p className="text-xs text-muted-foreground">
+                            {studentWithGuardian.assignedGuardian.email}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No guardian is connected.
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-xl border bg-slate-50/50 p-4">
@@ -471,7 +499,7 @@ export function CoachStudentDetailPage() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      No peer is currently assigned.
+                      No peer is connected.
                     </p>
                   )}
                 </div>

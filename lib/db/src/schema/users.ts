@@ -14,6 +14,7 @@ export const usersTable = pgTable("users", {
   coachId: integer("coach_id"),
   peerId: integer("peer_id"),
   studentId: integer("student_id"),
+  guardianId: integer("guardian_id"),
   bio: text("bio"),
   age: integer("age"),
   fieldsOfInterest: text("fields_of_interest").array().notNull().default([]),

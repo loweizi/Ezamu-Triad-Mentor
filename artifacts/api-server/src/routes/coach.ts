@@ -95,6 +95,19 @@ router.get("/coach/students/:studentId", requireAuth, async (req, res): Promise<
       .then(rows => rows[0] ?? null)
     : null;
 
+  const assignedGuardian = student.guardianId
+    ? await db.select({
+      id: usersTable.id,
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      email: usersTable.email,
+      profilePicUrl: usersTable.profilePicUrl,
+    })
+      .from(usersTable)
+      .where(eq(usersTable.id, student.guardianId))
+      .then(rows => rows[0] ?? null)
+    : null;
+
   const now = new Date();
   const upcoming = appointments
     .filter(a => new Date(a.scheduledAt) > now)
@@ -127,6 +140,7 @@ router.get("/coach/students/:studentId", requireAuth, async (req, res): Promise<
         status: a.status,
       })),
     assignedPeer,
+    assignedGuardian,
   });
 });
 

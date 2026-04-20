@@ -161,7 +161,15 @@ const ARCHETYPE_INFO: Record<string, {
     careers: ["Project manager", "Accountant", "Operations specialist", "Business administrator", "Logistician", "Teacher", "Healthcare administration or planning roles"],
   },
 };
-
+type PeerSummaryWithGuardian = {
+  guardian?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    profilePicUrl?: string | null;
+    email?: string | null;
+  } | null;
+};
 function jitsiRoomName(appointmentId: number) {
   return `ezamu-session-${appointmentId}`;
 }
@@ -411,6 +419,7 @@ export function StudentDashboardPage() {
   const [selectedAssessmentResult, setSelectedAssessmentResult] = useState<AssessmentResult | null>(null);
   const updateActionItem = useUpdateActionItem();
   const { data: peerSummary } = useGetPeerSummary();
+  const peerSummaryWithGuardian = peerSummary as (typeof peerSummary & PeerSummaryWithGuardian);
   const sendNudge = useSendNudge();
   const sendMessage = useSendMessage();
   const [nudgedIds, setNudgedIds] = useState<Set<number>>(new Set());
@@ -929,7 +938,7 @@ export function StudentDashboardPage() {
               </Card>
 
               {/* Triad Team */}
-              {(peerSummary || triadCoach) && (
+              {(peerSummary || triadCoach || peerSummaryWithGuardian?.guardian) && (
                 <Card className="shadow-sm border-none">
                   <CardHeader className="border-b bg-slate-50/50 pb-4">
                     <div>
@@ -938,13 +947,43 @@ export function StudentDashboardPage() {
                         Your Triad
                       </CardTitle>
                       <CardDescription className="mt-0.5">
-                        Your assigned coach and peer
+                        Your connected guardian, coach, and peer
                       </CardDescription>
                     </div>
                   </CardHeader>
 
                   <CardContent className="pt-4 pb-4 space-y-4">
                     <div className="grid grid-cols-1 gap-3">
+                      <div className="rounded-xl border bg-slate-50/50 p-4">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Guardian
+                        </p>
+
+                        {peerSummaryWithGuardian?.guardian ? (
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
+                              <AvatarImage src={peerSummaryWithGuardian.guardian.profilePicUrl ?? undefined} />
+                              <AvatarFallback className="bg-[#607b7d] text-white text-sm font-semibold">
+                                {peerSummaryWithGuardian.guardian.firstName[0]}
+                                {peerSummaryWithGuardian.guardian.lastName[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-semibold text-[#121c34] text-sm">
+                                {peerSummaryWithGuardian.guardian.firstName} {peerSummaryWithGuardian.guardian.lastName}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Assigned guardian
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No guardian is connected.
+                          </p>
+                        )}
+                      </div>
+
                       <div className="rounded-xl border bg-slate-50/50 p-4">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                           Coach
@@ -968,7 +1007,7 @@ export function StudentDashboardPage() {
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">
-                            No coach assigned yet.
+                            No coach is connected.
                           </p>
                         )}
                       </div>
@@ -999,7 +1038,7 @@ export function StudentDashboardPage() {
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">
-                            No peer assigned yet.
+                            No peer is connected.
                           </p>
                         )}
                       </div>

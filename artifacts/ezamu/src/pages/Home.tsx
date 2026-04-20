@@ -71,7 +71,7 @@ export function Home() {
               <span className="text-white/80 font-normal">: The All-In-One Mentorship Platform</span>
             </h1>
             <p className="text-base md:text-lg text-white/75 mb-10 leading-relaxed">
-              Connect with verified mentors, counsellors, and peers to discover majors best for you, explore career paths,
+              Connect with verified mentors, counselors, and peers to discover majors best for you, explore career paths,
               and build a plan for life after high school — all in one place.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">

@@ -46,6 +46,7 @@ type PeerDashboardResponse = {
     studentName: string;
     coachName?: string | null;
     peerName?: string | null;
+    guardianName?: string | null;
   };
 };
 
@@ -317,19 +318,19 @@ export function PeerDashboardPage() {
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">Student</p>
                       <p className="font-medium text-[#121c34] mt-1">
-                        {triad?.studentName ?? student?.name ?? "Not available"}
+                        {triad?.studentName || "No student is connected"}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">Coach</p>
                       <p className="font-medium text-[#121c34] mt-1">
-                        {triad?.coachName ?? "Not available"}
+                        {triad?.coachName || "No coach is connected"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Peer</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Guardian</p>
                       <p className="font-medium text-[#121c34] mt-1">
-                        {triad?.peerName ?? "You"}
+                        {triad?.guardianName || "No guardian is connected"}
                       </p>
                     </div>
                   </div>

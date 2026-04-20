@@ -298,6 +298,15 @@ router.delete("/users/me", requireAuth, async (req, res): Promise<void> => {
           .set({ coachId: null, studentId: null })
           .where(eq(usersTable.id, user.peerId));
       }
+
+      // If this student had a guardian, release that guardian
+      if (user.guardianId) {
+        await tx
+          .update(usersTable)
+          .set({ studentId: null })
+          .where(eq(usersTable.id, user.guardianId));
+      }
+
     }
 
     if (user.role === "peer") {
@@ -319,6 +328,15 @@ router.delete("/users/me", requireAuth, async (req, res): Promise<void> => {
         .update(appointmentsTable)
         .set({ peerId: null })
         .where(eq(appointmentsTable.peerId, user.id));
+    }
+
+    if (user.role === "guardian") {
+      if (user.studentId) {
+        await tx
+          .update(usersTable)
+          .set({ guardianId: null })
+          .where(eq(usersTable.id, user.studentId));
+      }
     }
 
     await tx.delete(usersTable).where(eq(usersTable.id, user.id));
@@ -497,6 +515,133 @@ router.post("/users/remove-peer", requireAuth, async (req, res): Promise<void> =
   res.json({ message: "Peer removed successfully" });
 });
 
+router.post("/users/assign-guardian", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const coach = await getOrCreateUser(clerkId);
+
+  if (!coach || coach.role !== "coach") {
+    res.status(403).json({ error: "Only coaches can assign guardians" });
+    return;
+  }
+
+  const { studentId, guardianId } = req.body ?? {};
+
+  if (typeof studentId !== "number" || typeof guardianId !== "number") {
+    res.status(400).json({ error: "studentId and guardianId must be numbers" });
+    return;
+  }
+
+  const [student] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, studentId));
+
+  const [guardian] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, guardianId));
+
+  if (!student || student.role !== "student") {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
+
+  if (!guardian || guardian.role !== "guardian") {
+    res.status(404).json({ error: "Guardian not found" });
+    return;
+  }
+
+  if (student.coachId && student.coachId !== coach.id) {
+    res.status(403).json({ error: "This student belongs to another coach" });
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    // If this student already has a guardian, release that old guardian first
+    if (student.guardianId) {
+      await tx
+        .update(usersTable)
+        .set({ studentId: null })
+        .where(eq(usersTable.id, student.guardianId));
+    }
+
+    // If this guardian is already linked to another student, clear that student's guardianId
+    if (guardian.studentId) {
+      await tx
+        .update(usersTable)
+        .set({ guardianId: null })
+        .where(eq(usersTable.id, guardian.studentId));
+    }
+
+    // Assign guardian to this student
+    await tx
+      .update(usersTable)
+      .set({ guardianId: guardian.id })
+      .where(eq(usersTable.id, student.id));
+
+    // Mark guardian as linked to this student
+    await tx
+      .update(usersTable)
+      .set({ studentId: student.id })
+      .where(eq(usersTable.id, guardian.id));
+  });
+
+  res.json({ message: "Guardian assigned successfully" });
+});
+
+router.post("/users/remove-guardian", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const coach = await getOrCreateUser(clerkId);
+
+  if (!coach || coach.role !== "coach") {
+    res.status(403).json({ error: "Only coaches can remove guardians" });
+    return;
+  }
+
+  const { studentId } = req.body ?? {};
+
+  if (typeof studentId !== "number") {
+    res.status(400).json({ error: "studentId must be a number" });
+    return;
+  }
+
+  const [student] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, studentId));
+
+  if (!student || student.role !== "student") {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
+
+  if (student.coachId !== coach.id) {
+    res.status(403).json({ error: "You are not assigned to this student" });
+    return;
+  }
+
+  if (!student.guardianId) {
+    res.status(400).json({ error: "This student does not have a guardian assigned" });
+    return;
+  }
+
+  const guardianId = student.guardianId;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(usersTable)
+      .set({ guardianId: null })
+      .where(eq(usersTable.id, student.id));
+
+    await tx
+      .update(usersTable)
+      .set({ studentId: null })
+      .where(eq(usersTable.id, guardianId));
+  });
+
+  res.json({ message: "Guardian removed successfully" });
+});
+
 router.get("/users/available-peers", requireAuth, async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const coach = await getOrCreateUser(clerkId);
@@ -558,6 +703,52 @@ router.get("/users/available-peers", requireAuth, async (req, res): Promise<void
   );
 });
 
+router.get("/users/available-guardians", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const coach = await getOrCreateUser(clerkId);
+
+  if (!coach || coach.role !== "coach") {
+    res.status(403).json({ error: "Only coaches can view guardians" });
+    return;
+  }
+
+  const rawGuardians = await db
+    .select({
+      id: usersTable.id,
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      email: usersTable.email,
+      profilePicUrl: usersTable.profilePicUrl,
+      bio: usersTable.bio,
+      age: usersTable.age,
+      studentId: usersTable.studentId,
+    })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.role, "guardian"),
+        eq(usersTable.onboardingCompleted, true),
+      )
+    );
+
+  const availableGuardians = rawGuardians.filter(
+    (guardian) => guardian.studentId == null
+  );
+
+  res.json(
+    availableGuardians.map((g) => ({
+      id: g.id,
+      firstName: g.firstName,
+      lastName: g.lastName,
+      name: `${g.firstName} ${g.lastName}`,
+      email: g.email,
+      profilePicUrl: g.profilePicUrl ?? null,
+      bio: g.bio ?? "",
+      age: g.age ?? null,
+    }))
+  );
+});
+
 router.get("/users/peer-dashboard", requireAuth, async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const peer = await getOrCreateUser(clerkId);
@@ -584,6 +775,10 @@ router.get("/users/peer-dashboard", requireAuth, async (req, res): Promise<void>
 
   const [coach] = student.coachId
     ? await db.select().from(usersTable).where(eq(usersTable.id, student.coachId))
+    : [null];
+
+  const [guardian] = student.guardianId
+    ? await db.select().from(usersTable).where(eq(usersTable.id, student.guardianId))
     : [null];
 
   const tasks = await db
@@ -643,8 +838,11 @@ router.get("/users/peer-dashboard", requireAuth, async (req, res): Promise<void>
     })),
     triad: {
       studentName: `${student.firstName} ${student.lastName}`,
-      coachName: coach ? `${coach.firstName} ${coach.lastName}` : null,
+      coachName: coach ? `${coach.firstName} ${coach.lastName}` : "No coach is connected",
       peerName: `${peer.firstName} ${peer.lastName}`,
+      guardianName: guardian
+        ? `${guardian.firstName} ${guardian.lastName}`
+        : "No guardian is connected",
     },
   });
 });

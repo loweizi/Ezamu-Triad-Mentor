@@ -28,6 +28,18 @@ router.get("/guardian/student", requireAuth, async (req, res): Promise<void> => 
     .from(usersTable)
     .where(eq(usersTable.id, studentId));
 
+  const [coach] = student.coachId
+    ? await db.select().from(usersTable).where(eq(usersTable.id, student.coachId))
+    : [null];
+
+  const [peer] = student.peerId
+    ? await db.select().from(usersTable).where(eq(usersTable.id, student.peerId))
+    : [null];
+
+  const [guardian] = student.guardianId
+    ? await db.select().from(usersTable).where(eq(usersTable.id, student.guardianId))
+    : [null];
+
   if (!student || student.role !== "student") {
     res.status(404).json({ error: "Student not found" });
     return;
@@ -64,14 +76,14 @@ router.get("/guardian/student", requireAuth, async (req, res): Promise<void> => 
     },
     assessment: assessment
       ? {
-          innerHeroType: assessment.innerHeroType,
-          helperScore: assessment.helperScore,
-          doerScore: assessment.doerScore,
-          thinkerScore: assessment.thinkerScore,
-          plannerScore: assessment.plannerScore,
-          summary: assessment.summary,
-          dateTaken: assessment.dateTaken.toISOString(),
-        }
+        innerHeroType: assessment.innerHeroType,
+        helperScore: assessment.helperScore,
+        doerScore: assessment.doerScore,
+        thinkerScore: assessment.thinkerScore,
+        plannerScore: assessment.plannerScore,
+        summary: assessment.summary,
+        dateTaken: assessment.dateTaken.toISOString(),
+      }
       : null,
     smartGoals: smartGoals.map((g) => ({
       ...g,
@@ -82,6 +94,19 @@ router.get("/guardian/student", requireAuth, async (req, res): Promise<void> => 
       ...i,
       createdAt: i.createdAt.toISOString(),
     })),
+
+    triad: {
+      studentName: `${student.firstName} ${student.lastName}`,
+      coachName: coach
+        ? `${coach.firstName} ${coach.lastName}`
+        : "No coach is connected",
+      peerName: peer
+        ? `${peer.firstName} ${peer.lastName}`
+        : "No peer is connected",
+      guardianName: guardian
+        ? `${guardian.firstName} ${guardian.lastName}`
+        : "No guardian is connected",
+    },
   });
 });
 
