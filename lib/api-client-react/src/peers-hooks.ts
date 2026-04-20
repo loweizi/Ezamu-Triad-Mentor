@@ -83,7 +83,14 @@ export interface PeerSummary {
     innerHeroArchetype: string | null;
     fieldsOfInterest: string[];
     bio: string | null;
-  };
+  } | null;
+  guardian: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    profilePicUrl: string | null;
+  } | null;
   actionItems: PeerActionItem[];
   smartGoals: PeerGoal[];
 }

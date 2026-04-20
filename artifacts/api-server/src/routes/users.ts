@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, and } from "drizzle-orm";
+import { eq, ilike, or, and, ne } from "drizzle-orm";
 import {
   actionItemsTable,
   appointmentsTable,
@@ -25,6 +25,7 @@ import {
 } from "@workspace/api-zod";
 import { clerkClient } from "@clerk/express";
 import { requireAuth } from "../middlewares/requireAuth";
+import { sendGuardianInviteEmail } from "../lib/email";
 
 const router: IRouter = Router();
 
@@ -357,16 +358,87 @@ router.delete("/users/me", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.get("/users/search", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const me = await getOrCreateUser(clerkId);
+
+  if (!me) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
   const parsed = SearchUsersQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
+  const search = parsed.data.email;
+
+  // Coaches can search everyone except themselves
+  if (me.role === "coach") {
+    const users = await db
+      .select()
+      .from(usersTable)
+      .where(
+        and(
+          ilike(usersTable.email, `%${search}%`),
+          ne(usersTable.id, me.id)
+        )
+      )
+      .limit(10);
+
+    res.json(users.map((u) => SearchUsersResponseItem.parse(u)));
+    return;
+  }
+
+  const allowedIds = new Set<number>();
+
+  if (me.role === "student") {
+    if (me.coachId) allowedIds.add(me.coachId);
+    if (me.peerId) allowedIds.add(me.peerId);
+    if (me.guardianId) allowedIds.add(me.guardianId);
+  }
+
+  if (me.role === "peer" && me.studentId) {
+    const [student] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, me.studentId));
+
+    if (student) {
+      allowedIds.add(student.id);
+      if (student.coachId) allowedIds.add(student.coachId);
+      if (student.guardianId) allowedIds.add(student.guardianId);
+    }
+  }
+
+  if (me.role === "guardian" && me.studentId) {
+    const [student] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, me.studentId));
+
+    if (student) {
+      allowedIds.add(student.id);
+      if (student.coachId) allowedIds.add(student.coachId);
+      if (student.peerId) allowedIds.add(student.peerId);
+    }
+  }
+
+  if (allowedIds.size === 0) {
+    res.json([]);
+    return;
+  }
+
   const users = await db
     .select()
     .from(usersTable)
-    .where(ilike(usersTable.email, `%${parsed.data.email}%`))
+    .where(
+      and(
+        ilike(usersTable.email, `%${search}%`),
+        or(...Array.from(allowedIds).map((id) => eq(usersTable.id, id)))
+      )
+    )
     .limit(10);
 
   res.json(users.map((u) => SearchUsersResponseItem.parse(u)));
@@ -668,6 +740,16 @@ router.post("/users/guardian-requests", requireAuth, async (req, res): Promise<v
     });
   }
 
+  try {
+    await sendGuardianInviteEmail({
+      to: normalizedEmail,
+      studentFirstName: student.firstName,
+      studentLastName: student.lastName,
+    });
+  } catch (error) {
+    console.error("Failed to send guardian invite email:", error);
+  }
+
   res.status(201).json({
     ...created,
     createdAt: created.createdAt.toISOString(),
@@ -858,6 +940,66 @@ router.patch("/users/guardian-requests/:id", requireAuth, async (req, res): Prom
 
   res.json({ message: "Guardian request rejected" });
 });
+router.post("/users/guardian-requests/:id/cancel", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const me = await getOrCreateUser(clerkId);
+
+  if (!me) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  if (me.role !== "student") {
+    res.status(403).json({ error: "Only students can cancel guardian requests" });
+    return;
+  }
+
+  const rawRequestId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const requestId = parseInt(rawRequestId, 10);
+
+  if (isNaN(requestId)) {
+    res.status(400).json({ error: "Invalid request id" });
+    return;
+  }
+
+  const [request] = await db
+    .select()
+    .from(guardianRequestsTable)
+    .where(eq(guardianRequestsTable.id, requestId));
+
+  if (!request) {
+    res.status(404).json({ error: "Guardian request not found" });
+    return;
+  }
+
+  if (request.studentId !== me.id) {
+    res.status(403).json({ error: "You can only cancel your own guardian requests" });
+    return;
+  }
+
+  if (request.status !== "pending") {
+    res.status(400).json({ error: "Only pending guardian requests can be cancelled" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(guardianRequestsTable)
+    .set({
+      status: "cancelled",
+      updatedAt: new Date(),
+    })
+    .where(eq(guardianRequestsTable.id, request.id))
+    .returning();
+
+  res.json({
+    message: "Guardian request cancelled successfully",
+    request: {
+      ...updated,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+    },
+  });
+});
 router.post("/users/remove-guardian", requireAuth, async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const coach = await getOrCreateUser(clerkId);
@@ -909,6 +1051,51 @@ router.post("/users/remove-guardian", requireAuth, async (req, res): Promise<voi
   });
 
   res.json({ message: "Guardian removed successfully" });
+});
+
+router.post("/users/remove-self-guardian", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const me = await getOrCreateUser(clerkId);
+
+  if (!me || me.role !== "guardian") {
+    res.status(403).json({ error: "Only guardians can remove themselves from a triad" });
+    return;
+  }
+
+  if (!me.studentId) {
+    res.status(400).json({ error: "You are not currently linked to a student" });
+    return;
+  }
+
+  const studentId = me.studentId;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(usersTable)
+      .set({ guardianId: null })
+      .where(eq(usersTable.id, studentId));
+
+    await tx
+      .update(usersTable)
+      .set({ studentId: null })
+      .where(eq(usersTable.id, me.id));
+
+    await tx
+      .update(guardianRequestsTable)
+      .set({
+        status: "cancelled",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(guardianRequestsTable.studentId, studentId),
+          eq(guardianRequestsTable.guardianUserId, me.id),
+          eq(guardianRequestsTable.status, "accepted"),
+        )
+      );
+  });
+
+  res.json({ message: "You have been removed from the triad" });
 });
 
 router.get("/users/available-peers", requireAuth, async (req, res): Promise<void> => {

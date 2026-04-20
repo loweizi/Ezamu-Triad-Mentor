@@ -20,7 +20,14 @@ import {
   Mail,
   ChevronDown,
   ChevronUp,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -86,6 +93,8 @@ export function GuardianPage() {
     data: studentData,
     isLoading: isFetchingStudent,
   } = useGetGuardianStudentDetail(studentId);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [isRemovingSelf, setIsRemovingSelf] = useState(false);
   const toggleGoal = (goalId: number) => {
     setExpandedGoalIds((prev) =>
       prev.includes(goalId)
@@ -222,7 +231,58 @@ export function GuardianPage() {
       setIsRespondingId(null);
     }
   };
+  const handleRemoveSelfFromTriad = async () => {
+    setIsRemovingSelf(true);
 
+    try {
+      const response = await fetch("/api/users/remove-self-guardian", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to remove guardian from triad");
+      }
+
+      toast({
+        title: "Removed from triad",
+        description: "You have been disconnected from this student.",
+      });
+
+      setRemoveDialogOpen(false);
+      setStudentId(null);
+      setLinkedEmail(null);
+
+      const refreshed = await fetch("/api/users/guardian-requests", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (refreshed.ok) {
+        const refreshedData: GuardianRequest[] = await refreshed.json();
+        setRequests(refreshedData);
+      } else {
+        setRequests([]);
+      }
+    } catch (error) {
+      toast({
+        title: "Could not remove guardian",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRemovingSelf(false);
+    }
+  };
   const handleNudgeStudent = () => {
     if (!studentData?.student?.id) {
       toast({
@@ -819,13 +879,61 @@ export function GuardianPage() {
                 </CardContent>
               </Card>
 
-              <div className="text-xs text-muted-foreground text-right">
-                Guardian view is read-only. Editing is disabled.
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-xs text-muted-foreground">
+                  Guardian view is read-only. Editing is disabled.
+                </p>
+
+                <Button
+                  variant="outline"
+                  onClick={() => setRemoveDialogOpen(true)}
+                  className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  Remove myself from this triad
+                </Button>
               </div>
             </>
           )}
         </div>
       </div>
+      <Dialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#121c34] font-serif text-xl flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              Remove yourself from this triad?
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              This will disconnect you from the student and remove your guardian link.
+              You can be invited again later if needed.
+            </p>
+          </DialogHeader>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              onClick={handleRemoveSelfFromTriad}
+              disabled={isRemovingSelf}
+              className="bg-red-600 hover:bg-red-700 text-white border-none"
+            >
+              {isRemovingSelf ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Yes, remove me"
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setRemoveDialogOpen(false)}
+              disabled={isRemovingSelf}
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

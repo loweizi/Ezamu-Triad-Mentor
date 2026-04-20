@@ -15,6 +15,7 @@ import {
   useSendMessage,
   useSearchUsers,
   useMarkMessagesRead,
+  useGetMe,
   getGetConversationsQueryKey,
   getGetMessagesQueryKey,
 } from "@workspace/api-client-react";
@@ -23,12 +24,27 @@ import { format } from "date-fns";
 import { Send, User as UserIcon, Loader2, MessageSquare, PenSquare, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/useDebounce";
+import { get } from "node:http";
+
+type AllowedChatContact = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  profilePicUrl: string | null;
+  role: string;
+};
 
 export function ChatPage() {
   const queryClient = useQueryClient();
   const [activeUserId, setActiveUserId] = useState<number | null>(null);
   const [messageText, setMessageText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { data: me } = useGetMe();
+  const previousMessageCountRef = useRef(0);
+
+  const [allowedContacts, setAllowedContacts] = useState<AllowedChatContact[]>([]);
+  const [isLoadingAllowedContacts, setIsLoadingAllowedContacts] = useState(false);
 
   // New chat dialog state
   const [newChatOpen, setNewChatOpen] = useState(false);
@@ -37,20 +53,82 @@ export function ChatPage() {
   // Holds the user picked from search until they appear in the conversations list
   const [newChatTarget, setNewChatTarget] = useState<UserSummary | null>(null);
 
-  const { data: conversations, isLoading: isConvLoading } = useGetConversations();
+  const { data: conversations, isLoading: isConvLoading } = useGetConversations({
+    query: {
+      queryKey: getGetConversationsQueryKey(),
+      refetchInterval: 5000,
+      refetchIntervalInBackground: true,
+    },
+  });
 
   const { data: messages, isLoading: isMsgLoading } = useGetMessages(
     { withUserId: activeUserId! },
-    { query: { enabled: !!activeUserId, queryKey: getGetMessagesQueryKey({ withUserId: activeUserId! }) } }
+    {
+      query: {
+        enabled: !!activeUserId,
+        queryKey: getGetMessagesQueryKey({ withUserId: activeUserId! }),
+        refetchInterval: activeUserId ? 2500 : false,
+        refetchIntervalInBackground: true,
+      },
+    }
   );
 
   const { data: searchResults, isFetching: isSearching } = useSearchUsers(
     { email: debouncedEmail },
-    { query: { enabled: debouncedEmail.length >= 2 } }
+    {
+      query: {
+        enabled: !!me && me.role === "coach" && debouncedEmail.length >= 2,
+        queryKey: ["users-search", debouncedEmail],
+      },
+    }
   );
 
   const sendMessage = useSendMessage();
   const markRead = useMarkMessagesRead();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAllowedContacts = async () => {
+      if (!newChatOpen || !me || me.role === "coach") return;
+
+      setIsLoadingAllowedContacts(true);
+
+      try {
+        const response = await fetch("/api/messages/allowed-contacts", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load chat contacts");
+        }
+
+        const data: AllowedChatContact[] = await response.json();
+
+        if (isMounted) {
+          setAllowedContacts(data);
+        }
+      } catch {
+        if (isMounted) {
+          setAllowedContacts([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingAllowedContacts(false);
+        }
+      }
+    };
+
+    loadAllowedContacts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [newChatOpen, me]);
 
   // Set initial active user if conversations exist
   useEffect(() => {
@@ -64,12 +142,18 @@ export function ChatPage() {
     if (activeUserId) {
       markRead.mutate(activeUserId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeUserId]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const currentCount = messages?.length ?? 0;
+
+    if (currentCount > previousMessageCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+
+    previousMessageCountRef.current = currentCount;
   }, [messages]);
 
   const handleSend = (e: React.FormEvent) => {
@@ -104,14 +188,14 @@ export function ChatPage() {
   const activeUser = conversationEntry ?? (
     newChatTarget && newChatTarget.id === activeUserId
       ? {
-          userId: newChatTarget.id,
-          firstName: newChatTarget.firstName,
-          lastName: newChatTarget.lastName,
-          profilePicUrl: newChatTarget.profilePicUrl ?? null,
-          lastMessage: "",
-          lastMessageAt: new Date().toISOString(),
-          unreadCount: 0,
-        }
+        userId: newChatTarget.id,
+        firstName: newChatTarget.firstName,
+        lastName: newChatTarget.lastName,
+        profilePicUrl: newChatTarget.profilePicUrl ?? null,
+        lastMessage: "",
+        lastMessageAt: new Date().toISOString(),
+        unreadCount: 0,
+      }
       : undefined
   );
 
@@ -157,9 +241,8 @@ export function ChatPage() {
                   <button
                     key={conv.userId}
                     onClick={() => setActiveUserId(conv.userId)}
-                    className={`w-full text-left p-4 flex items-center gap-3 transition-colors ${
-                      activeUserId === conv.userId ? "bg-slate-50 border-l-4 border-l-[#3131d8]" : "hover:bg-slate-50 border-l-4 border-l-transparent"
-                    }`}
+                    className={`w-full text-left p-4 flex items-center gap-3 transition-colors ${activeUserId === conv.userId ? "bg-slate-50 border-l-4 border-l-[#3131d8]" : "hover:bg-slate-50 border-l-4 border-l-transparent"
+                      }`}
                   >
                     <Avatar className="h-12 w-12 border border-slate-100">
                       <AvatarImage src={conv.profilePicUrl || undefined} />
@@ -222,11 +305,10 @@ export function ChatPage() {
                       const isMe = msg.senderId !== activeUserId;
                       return (
                         <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm ${
-                            isMe
-                              ? 'bg-[#121c34] text-white rounded-br-none'
-                              : 'bg-white border border-slate-100 text-[#121c34] rounded-bl-none'
-                          }`}>
+                          <div className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm ${isMe
+                            ? 'bg-[#121c34] text-white rounded-br-none'
+                            : 'bg-white border border-slate-100 text-[#121c34] rounded-bl-none'
+                            }`}>
                             <p className="whitespace-pre-wrap">{msg.content}</p>
                             <span className={`text-[10px] block mt-1 ${isMe ? 'text-white/60 text-right' : 'text-muted-foreground'}`}>
                               {format(new Date(msg.createdAt), "h:mm a")}
@@ -281,59 +363,121 @@ export function ChatPage() {
       <Dialog open={newChatOpen} onOpenChange={(open) => { setNewChatOpen(open); if (!open) setSearchEmail(""); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[#121c34] font-serif text-xl">New Conversation</DialogTitle>
+            <DialogTitle className="text-[#121c34] font-serif text-xl">
+              New Conversation
+            </DialogTitle>
           </DialogHeader>
 
           <div className="mt-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <Input
-                autoFocus
-                placeholder="Search by email address..."
-                value={searchEmail}
-                onChange={(e) => setSearchEmail(e.target.value)}
-                className="pl-9 h-11 focus-visible:ring-[#3131d8]"
-              />
-              {isSearching && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
-              )}
-            </div>
+            {me?.role === "coach" ? (
+              <>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    autoFocus
+                    placeholder="Search by email address..."
+                    value={searchEmail}
+                    onChange={(e) => setSearchEmail(e.target.value)}
+                    className="pl-9 h-11 focus-visible:ring-[#3131d8]"
+                  />
+                  {isSearching && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
 
-            <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-slate-100">
-              {debouncedEmail.length < 2 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">
-                  Type at least 2 characters to search
+                <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-slate-100">
+                  {debouncedEmail.length < 2 ? (
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      Type at least 2 characters to search
+                    </div>
+                  ) : searchResults && searchResults.length === 0 && !isSearching ? (
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      No users found for{" "}
+                      <span className="font-medium text-[#121c34]">"{debouncedEmail}"</span>
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {searchResults?.map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => handleStartChat(user)}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors text-left"
+                        >
+                          <Avatar className="h-10 w-10 border border-slate-100">
+                            <AvatarImage src={user.profilePicUrl || undefined} />
+                            <AvatarFallback className="bg-[#607b7d] text-white text-sm">
+                              {user.firstName.charAt(0)}
+                              {user.lastName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-[#121c34] truncate">
+                              {user.firstName} {user.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {user.email}
+                            </p>
+                          </div>
+                          <span className="text-xs capitalize px-2 py-0.5 rounded-full bg-[#3131d8]/10 text-[#3131d8] font-medium flex-shrink-0">
+                            {user.role}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ) : searchResults && searchResults.length === 0 && !isSearching ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">
-                  No users found for <span className="font-medium text-[#121c34]">"{debouncedEmail}"</span>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {searchResults?.map(user => (
-                    <button
-                      key={user.id}
-                      onClick={() => handleStartChat(user)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors text-left"
-                    >
-                      <Avatar className="h-10 w-10 border border-slate-100">
-                        <AvatarImage src={user.profilePicUrl || undefined} />
-                        <AvatarFallback className="bg-[#607b7d] text-white text-sm">
-                          {user.firstName.charAt(0)}{user.lastName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-[#121c34] truncate">{user.firstName} {user.lastName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                      </div>
-                      <span className="text-xs capitalize px-2 py-0.5 rounded-full bg-[#3131d8]/10 text-[#3131d8] font-medium flex-shrink-0">
-                        {user.role}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+              </>
+            ) : (
+              <div className="mt-1 max-h-80 overflow-y-auto rounded-lg border border-slate-100">
+                {isLoadingAllowedContacts ? (
+                  <div className="p-6 flex justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : allowedContacts.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    No triad members are available to message yet.
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {allowedContacts.map((contact) => (
+                      <button
+                        key={contact.id}
+                        onClick={() =>
+                          handleStartChat({
+                            id: contact.id,
+                            firstName: contact.firstName,
+                            lastName: contact.lastName,
+                            email: contact.email,
+                            profilePicUrl: contact.profilePicUrl,
+                            role: contact.role as any,
+                          })
+                        }
+                        className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors text-left"
+                      >
+                        <Avatar className="h-10 w-10 border border-slate-100">
+                          <AvatarImage src={contact.profilePicUrl || undefined} />
+                          <AvatarFallback className="bg-[#607b7d] text-white text-sm">
+                            {contact.firstName.charAt(0)}
+                            {contact.lastName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-[#121c34] truncate">
+                            {contact.firstName} {contact.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {contact.email}
+                          </p>
+                        </div>
+                        <span className="text-xs capitalize px-2 py-0.5 rounded-full bg-[#3131d8]/10 text-[#3131d8] font-medium flex-shrink-0">
+                          {contact.role}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

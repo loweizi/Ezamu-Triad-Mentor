@@ -28,6 +28,7 @@ import {
   useGetAssessmentResults,
   getGetActionItemsQueryKey,
   getGetDashboardSummaryQueryKey,
+  PEER_SUMMARY_QUERY_KEY,
   type SmartGoal,
   type ActionItem,
   type PeerActionItem,
@@ -442,6 +443,8 @@ export function StudentDashboardPage() {
   const [guardianRequests, setGuardianRequests] = useState<GuardianRequest[]>([]);
   const [isLoadingGuardianRequests, setIsLoadingGuardianRequests] = useState(false);
   const [isSendingGuardianInvite, setIsSendingGuardianInvite] = useState(false);
+  const [isCancellingGuardianInvite, setIsCancellingGuardianInvite] = useState(false);
+
   const handleMarkComplete = async (itemId: number) => {
     setCompletingId(itemId);
     try {
@@ -517,6 +520,59 @@ export function StudentDashboardPage() {
       setIsSendingGuardianInvite(false);
     }
   };
+  const handleCancelGuardianInvite = async () => {
+    if (!pendingGuardianRequest) return;
+
+    setIsCancellingGuardianInvite(true);
+
+    try {
+      const response = await fetch(
+        `/api/users/guardian-requests/${pendingGuardianRequest.id}/cancel`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to cancel guardian invite");
+      }
+
+      toast({
+        title: "Invite cancelled",
+        description: "The guardian invitation has been cancelled.",
+      });
+
+      const refreshResponse = await fetch("/api/users/guardian-requests", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (refreshResponse.ok) {
+        const refreshed: GuardianRequest[] = await refreshResponse.json();
+        setGuardianRequests(refreshed);
+      }
+
+      queryClient.invalidateQueries({ queryKey: PEER_SUMMARY_QUERY_KEY });
+    } catch (error) {
+      toast({
+        title: "Could not cancel invite",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCancellingGuardianInvite(false);
+    }
+  };
   const handleNudge = async (taskTitle?: string, taskId?: number) => {
     try {
       await sendNudge.mutateAsync(taskTitle);
@@ -526,7 +582,7 @@ export function StudentDashboardPage() {
         setNudgedAll(true);
         setTimeout(() => setNudgedAll(false), 5000);
       }
-      if (peerSummary?.peer.id && user) {
+      if (peerSummary?.peer?.id && user) {
         const targetTask = taskTitle ?? peerSummary.actionItems[0]?.title;
         if (targetTask) {
           const senderName = `${user.firstName} ${user.lastName}`;
@@ -537,8 +593,18 @@ export function StudentDashboardPage() {
             },
           });
         }
+
+        toast({
+          title: "Nudge sent!",
+          description: `${peerSummary.peer.firstName} has been notified.`,
+        });
+      } else {
+        toast({
+          title: "No peer connected",
+          description: "You can only send a nudge when a peer is connected.",
+          variant: "destructive",
+        });
       }
-      toast({ title: "Nudge sent!", description: `${peerSummary?.peer.firstName} has been notified.` });
     } catch {
       toast({ title: "Failed to send nudge", variant: "destructive" });
     }
@@ -585,6 +651,8 @@ export function StudentDashboardPage() {
     };
   }, [appointments]);
   useEffect(() => {
+    let isMounted = true;
+
     const loadGuardianRequests = async () => {
       if (!user || user.role !== "student") return;
 
@@ -603,30 +671,45 @@ export function StudentDashboardPage() {
         }
 
         const data: GuardianRequest[] = await response.json();
-        setGuardianRequests(data);
+
+        if (isMounted) {
+          setGuardianRequests(data);
+        }
+
+        queryClient.invalidateQueries({ queryKey: PEER_SUMMARY_QUERY_KEY });
       } catch {
-        toast({
-          title: "Could not load guardian invite status",
-          description: "Please refresh and try again.",
-          variant: "destructive",
-        });
+        if (isMounted) {
+          toast({
+            title: "Could not load guardian invite status",
+            description: "Please refresh and try again.",
+            variant: "destructive",
+          });
+        }
       } finally {
-        setIsLoadingGuardianRequests(false);
+        if (isMounted) {
+          setIsLoadingGuardianRequests(false);
+        }
       }
     };
 
     loadGuardianRequests();
-  }, [user, toast]);
-  if (isLoading) {
-    return (
-      <MainLayout>
-        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
-          <Loader2 className="w-8 h-8 animate-spin mb-4 text-primary" />
-          <p>Loading your dashboard...</p>
-        </div>
-      </MainLayout>
-    );
-  }
+
+    const interval = window.setInterval(() => {
+      loadGuardianRequests();
+    }, 5000);
+
+    const handleFocus = () => {
+      loadGuardianRequests();
+    };
+
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [user, toast, queryClient]);
 
   const pendingItems = actionItems?.filter(i => !i.completed) || [];
   const completedItems = actionItems?.filter(i => i.completed) || [];
@@ -640,8 +723,12 @@ export function StudentDashboardPage() {
   const pendingGuardianRequest = guardianRequests.find(
     (request) => request.status === "pending"
   );
+  const acceptedGuardianRequest = guardianRequests.find(
+    (request) => request.status === "accepted"
+  );
 
-  const hasGuardianConnected = !!peerSummaryWithGuardian?.guardian;
+  const hasGuardianConnected =
+    !!peerSummaryWithGuardian?.guardian || !!acceptedGuardianRequest;
 
 
   return (
@@ -1073,31 +1160,55 @@ export function StudentDashboardPage() {
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
                             <AvatarImage
-                              src={peerSummaryWithGuardian.guardian?.profilePicUrl ?? undefined}
+                              src={peerSummaryWithGuardian?.guardian?.profilePicUrl ?? undefined}
                             />
                             <AvatarFallback className="bg-[#607b7d] text-white text-sm font-semibold">
-                              {peerSummaryWithGuardian.guardian?.firstName?.[0]}
-                              {peerSummaryWithGuardian.guardian?.lastName?.[0]}
+                              {peerSummaryWithGuardian?.guardian
+                                ? `${peerSummaryWithGuardian.guardian.firstName?.[0] ?? ""}${peerSummaryWithGuardian.guardian.lastName?.[0] ?? ""}`
+                                : "G"}
                             </AvatarFallback>
                           </Avatar>
+
                           <div>
                             <p className="font-semibold text-[#121c34] text-sm">
-                              {peerSummaryWithGuardian.guardian?.firstName}{" "}
-                              {peerSummaryWithGuardian.guardian?.lastName}
+                              {peerSummaryWithGuardian?.guardian
+                                ? `${peerSummaryWithGuardian.guardian.firstName} ${peerSummaryWithGuardian.guardian.lastName}`
+                                : "Guardian connected"}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Assigned guardian
+                              {peerSummaryWithGuardian?.guardian?.email ??
+                                acceptedGuardianRequest?.guardianEmail ??
+                                "Assigned guardian"}
                             </p>
                           </div>
                         </div>
                       ) : pendingGuardianRequest ? (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                          <p className="text-sm font-medium text-amber-700">
-                            Invite pending
-                          </p>
-                          <p className="text-xs text-amber-700/80 mt-1 break-all">
-                            {pendingGuardianRequest.guardianEmail}
-                          </p>
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 space-y-2">
+                          <div>
+                            <p className="text-sm font-medium text-amber-700">
+                              Invite pending
+                            </p>
+                            <p className="text-xs text-amber-700/80 mt-1 break-all">
+                              {pendingGuardianRequest.guardianEmail}
+                            </p>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelGuardianInvite}
+                            disabled={isCancellingGuardianInvite}
+                            className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                          >
+                            {isCancellingGuardianInvite ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Cancelling...
+                              </>
+                            ) : (
+                              "Cancel Invite"
+                            )}
+                          </Button>
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -1150,7 +1261,7 @@ export function StudentDashboardPage() {
                         Peer
                       </p>
 
-                      {peerSummary ? (
+                      {peerSummary?.peer ? (
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
                             <AvatarImage src={peerSummary.peer.profilePicUrl ?? undefined} />

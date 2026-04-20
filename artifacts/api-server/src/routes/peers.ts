@@ -298,28 +298,21 @@ router.get("/peer/summary", requireAuth, async (req, res): Promise<void> => {
 
   // STUDENT VIEW: return assigned peer summary
   if (me.role === "student") {
-    if (!me.peerId) {
-      res.status(200).json(null);
-      return;
-    }
+    const [peer] = me.peerId
+      ? await db
+        .select({
+          id: usersTable.id,
+          firstName: usersTable.firstName,
+          lastName: usersTable.lastName,
+          profilePicUrl: usersTable.profilePicUrl,
+          innerHeroArchetype: usersTable.innerHeroArchetype,
+          fieldsOfInterest: usersTable.fieldsOfInterest,
+          bio: usersTable.bio,
+        })
+        .from(usersTable)
+        .where(eq(usersTable.id, me.peerId))
+      : [null];
 
-    const [peer] = await db
-      .select({
-        id: usersTable.id,
-        firstName: usersTable.firstName,
-        lastName: usersTable.lastName,
-        profilePicUrl: usersTable.profilePicUrl,
-        innerHeroArchetype: usersTable.innerHeroArchetype,
-        fieldsOfInterest: usersTable.fieldsOfInterest,
-        bio: usersTable.bio,
-      })
-      .from(usersTable)
-      .where(eq(usersTable.id, me.peerId));
-
-    if (!peer) {
-      res.status(200).json(null);
-      return;
-    }
     const [guardian] = me.guardianId
       ? await db
         .select({
@@ -332,6 +325,7 @@ router.get("/peer/summary", requireAuth, async (req, res): Promise<void> => {
         .from(usersTable)
         .where(eq(usersTable.id, me.guardianId))
       : [null];
+
     const actionItems = await db
       .select()
       .from(actionItemsTable)
@@ -347,8 +341,23 @@ router.get("/peer/summary", requireAuth, async (req, res): Promise<void> => {
       .from(smartGoalsTable)
       .where(eq(smartGoalsTable.studentId, me.id));
 
+    if (!peer && !guardian) {
+      res.status(200).json(null);
+      return;
+    }
+
     res.json({
-      peer,
+      peer: peer
+        ? {
+          id: peer.id,
+          firstName: peer.firstName,
+          lastName: peer.lastName,
+          profilePicUrl: peer.profilePicUrl,
+          innerHeroArchetype: peer.innerHeroArchetype,
+          fieldsOfInterest: peer.fieldsOfInterest,
+          bio: peer.bio,
+        }
+        : null,
       guardian: guardian
         ? {
           id: guardian.id,

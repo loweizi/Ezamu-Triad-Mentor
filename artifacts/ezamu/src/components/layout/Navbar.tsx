@@ -19,7 +19,15 @@ export function Navbar() {
   const { signOut } = useClerk();
   const { user } = useUser();
   const { data: appUser } = useGetMe();
-  const { data: dashboardSummary } = useGetDashboardSummary();
+  const { data: dashboardSummary } = useGetDashboardSummary(
+    {
+      query: {
+        queryKey: ["dashboard-summary"],
+        refetchInterval: 5000,
+        refetchIntervalInBackground: true,
+      },
+    }
+  );
   const unreadCount = dashboardSummary?.unreadMessagesCount || 0;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
