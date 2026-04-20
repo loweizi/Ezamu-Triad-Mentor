@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -21,10 +21,22 @@ import {
 } from "@workspace/api-client-react";
 import type { UserSummary } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Send, User as UserIcon, Loader2, MessageSquare, PenSquare, Search } from "lucide-react";
+import {
+  Send,
+  Loader2,
+  MessageSquare,
+  PenSquare,
+  Search,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
+  Link2,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/useDebounce";
-import { get } from "node:http";
+import { Input } from "@/components/ui/input";
 
 type AllowedChatContact = {
   id: number;
@@ -52,6 +64,7 @@ export function ChatPage() {
   const debouncedEmail = useDebounce(searchEmail, 300);
   // Holds the user picked from search until they appear in the conversations list
   const [newChatTarget, setNewChatTarget] = useState<UserSummary | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: conversations, isLoading: isConvLoading } = useGetConversations({
     query: {
@@ -155,6 +168,281 @@ export function ChatPage() {
 
     previousMessageCountRef.current = currentCount;
   }, [messages]);
+  const applyWrapFormatting = (prefix: string, suffix = prefix) => {
+    const textarea = composerRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    const selected = messageText.slice(start, end);
+    const replacement = `${prefix}${selected}${suffix}`;
+
+    const next =
+      messageText.slice(0, start) + replacement + messageText.slice(end);
+
+    setMessageText(next);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      if (selected.length > 0) {
+        textarea.setSelectionRange(
+          start + prefix.length,
+          end + prefix.length
+        );
+      } else {
+        const caret = start + prefix.length;
+        textarea.setSelectionRange(caret, caret);
+      }
+    });
+  };
+
+  const applyLinePrefixFormatting = (prefix: string) => {
+    const textarea = composerRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+
+    const lineStart = messageText.lastIndexOf("\n", start - 1) + 1;
+    const lineEnd =
+      end < messageText.length
+        ? messageText.indexOf("\n", end) === -1
+          ? messageText.length
+          : messageText.indexOf("\n", end)
+        : messageText.length;
+
+    const selectedBlock = messageText.slice(lineStart, lineEnd);
+    const updatedBlock = selectedBlock
+      .split("\n")
+      .map((line) => `${prefix}${line}`)
+      .join("\n");
+
+    const next =
+      messageText.slice(0, lineStart) +
+      updatedBlock +
+      messageText.slice(lineEnd);
+
+    setMessageText(next);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(lineStart, lineStart + updatedBlock.length);
+    });
+  };
+
+  const applyNumberedListFormatting = () => {
+    const textarea = composerRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+
+    const lineStart = messageText.lastIndexOf("\n", start - 1) + 1;
+    const lineEnd =
+      end < messageText.length
+        ? messageText.indexOf("\n", end) === -1
+          ? messageText.length
+          : messageText.indexOf("\n", end)
+        : messageText.length;
+
+    const selectedBlock = messageText.slice(lineStart, lineEnd);
+    const updatedBlock = selectedBlock
+      .split("\n")
+      .map((line, index) => `${index + 1}. ${line}`)
+      .join("\n");
+
+    const next =
+      messageText.slice(0, lineStart) +
+      updatedBlock +
+      messageText.slice(lineEnd);
+
+    setMessageText(next);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(lineStart, lineStart + updatedBlock.length);
+    });
+  };
+
+  const applyLinkFormatting = () => {
+    const textarea = composerRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    const selected = messageText.slice(start, end) || "link text";
+    const replacement = `[${selected}](https://)`;
+
+    const next =
+      messageText.slice(0, start) + replacement + messageText.slice(end);
+
+    setMessageText(next);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const urlStart = start + selected.length + 3;
+      const urlEnd = urlStart + "https://".length;
+      textarea.setSelectionRange(urlStart, urlEnd);
+    });
+  };
+
+  const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+
+    const textarea = composerRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+
+    if (start !== end) return;
+
+    const lineStart = messageText.lastIndexOf("\n", start - 1) + 1;
+    const currentLine = messageText.slice(lineStart, start);
+
+    const bulletMatch = currentLine.match(/^(\s*-\s)/);
+    const numberedMatch = currentLine.match(/^(\s*)(\d+)\.\s/);
+
+    if (bulletMatch) {
+      e.preventDefault();
+
+      const prefix = bulletMatch[1];
+      const insertion = `\n${prefix}`;
+      const next =
+        messageText.slice(0, start) + insertion + messageText.slice(end);
+
+      setMessageText(next);
+
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const caret = start + insertion.length;
+        textarea.setSelectionRange(caret, caret);
+      });
+
+      return;
+    }
+
+    if (numberedMatch) {
+      e.preventDefault();
+
+      const indent = numberedMatch[1] ?? "";
+      const currentNumber = Number(numberedMatch[2]);
+      const nextNumber = currentNumber + 1;
+      const insertion = `\n${indent}${nextNumber}. `;
+      const next =
+        messageText.slice(0, start) + insertion + messageText.slice(end);
+
+      setMessageText(next);
+
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const caret = start + insertion.length;
+        textarea.setSelectionRange(caret, caret);
+      });
+    }
+  };
+
+  const renderInlineFormatting = (text: string, keyPrefix: string) => {
+    const parts: React.ReactNode[] = [];
+    const regex =
+      /(\*\*([^*]+)\*\*|_([^_]+)_|~([^~]+)~|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\))/g;
+
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let index = 0;
+
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+
+      if (match[2]) {
+        parts.push(
+          <strong key={`${keyPrefix}-b-${index++}`}>{match[2]}</strong>
+        );
+      } else if (match[3]) {
+        parts.push(<em key={`${keyPrefix}-i-${index++}`}>{match[3]}</em>);
+      } else if (match[4]) {
+        parts.push(
+          <span key={`${keyPrefix}-u-${index++}`} className="underline">
+            {match[4]}
+          </span>
+        );
+      } else if (match[5] && match[6]) {
+        parts.push(
+          <a
+            key={`${keyPrefix}-l-${index++}`}
+            href={match[6]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline break-all"
+          >
+            {match[5]}
+          </a>
+        );
+      }
+
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : text;
+  };
+
+  const renderMessageContent = (content: string) => {
+    const lines = content.split("\n");
+
+    const elements: React.ReactNode[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      if (line.startsWith("- ")) {
+        const items: string[] = [];
+        while (i < lines.length && lines[i].startsWith("- ")) {
+          items.push(lines[i].slice(2));
+          i++;
+        }
+        elements.push(
+          <ul key={`ul-${i}`} className="list-disc pl-5 space-y-1">
+            {items.map((item, idx) => (
+              <li key={idx}>{renderInlineFormatting(item, `ul-${i}-${idx}`)}</li>
+            ))}
+          </ul>
+        );
+        continue;
+      }
+
+      if (/^\d+\.\s/.test(line)) {
+        const items: string[] = [];
+        while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+          items.push(lines[i].replace(/^\d+\.\s/, ""));
+          i++;
+        }
+        elements.push(
+          <ol key={`ol-${i}`} className="list-decimal pl-5 space-y-1">
+            {items.map((item, idx) => (
+              <li key={idx}>{renderInlineFormatting(item, `ol-${i}-${idx}`)}</li>
+            ))}
+          </ol>
+        );
+        continue;
+      }
+
+      elements.push(
+        <p key={`p-${i}`} className="whitespace-pre-wrap">
+          {renderInlineFormatting(line, `p-${i}`)}
+        </p>
+      );
+      i++;
+    }
+
+    return <div className="space-y-2">{elements}</div>;
+  };
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -309,7 +597,9 @@ export function ChatPage() {
                             ? 'bg-[#121c34] text-white rounded-br-none'
                             : 'bg-white border border-slate-100 text-[#121c34] rounded-bl-none'
                             }`}>
-                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                            <div className="text-sm leading-relaxed">
+                              {renderMessageContent(msg.content)}
+                            </div>
                             <span className={`text-[10px] block mt-1 ${isMe ? 'text-white/60 text-right' : 'text-muted-foreground'}`}>
                               {format(new Date(msg.createdAt), "h:mm a")}
                             </span>
@@ -324,21 +614,103 @@ export function ChatPage() {
 
               {/* Input Area */}
               <div className="p-4 bg-white border-t">
-                <form onSubmit={handleSend} className="flex gap-2 max-w-4xl mx-auto">
-                  <Input
-                    placeholder="Type a message..."
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    className="flex-1 h-12 rounded-full px-6 bg-slate-50 border-slate-200 focus-visible:ring-[#3131d8]"
-                  />
-                  <Button
-                    type="submit"
-                    size="icon"
-                    className="h-12 w-12 rounded-full bg-[#121c34] hover:bg-[#121c34]/90 flex-shrink-0"
-                    disabled={!messageText.trim() || sendMessage.isPending}
-                  >
-                    {sendMessage.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-1" />}
-                  </Button>
+                <form onSubmit={handleSend} className="max-w-4xl mx-auto">
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1 space-y-2">
+                      <div className="mx-auto w-fit flex flex-wrap items-center justify-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">                        <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 p-0 inline-flex items-center justify-center"
+                        onClick={() => applyWrapFormatting("**")}
+                        title="Bold"
+                      >
+                        <Bold className="w-4 h-4 block" />
+                      </Button>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 p-0 flex items-center justify-center"
+                          onClick={() => applyWrapFormatting("_")}
+                          title="Italic"
+                        >
+                          <Italic className="w-4 h-4 block" />
+                        </Button>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 p-0 flex items-center justify-center"
+                          onClick={() => applyWrapFormatting("~")}
+                          title="Underline"
+                        >
+                          <Underline className="w-4 h-4 block" />
+                        </Button>
+
+                        <div className="mx-1 h-5 w-px bg-slate-200" />
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 p-0 flex items-center justify-center"
+                          onClick={() => applyLinePrefixFormatting("- ")}
+                          title="Bullet List"
+                        >
+                          <List className="w-4 h-4 block" />
+                        </Button>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 p-0 flex items-center justify-center"
+                          onClick={applyNumberedListFormatting}
+                          title="Numbered List"
+                        >
+                          <ListOrdered className="w-4 h-4 block" />
+                        </Button>
+
+                        <div className="mx-1 h-5 w-px bg-slate-200" />
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 p-0 flex items-center justify-center"
+                          onClick={applyLinkFormatting}
+                          title="Insert Link"
+                        >
+                          <Link2 className="w-4 h-4 block" />
+                        </Button>
+                      </div>
+
+                      <Textarea
+                        ref={composerRef}
+                        placeholder="Type a message..."
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        onKeyDown={handleComposerKeyDown}
+                        className="w-full min-h-[52px] max-h-40 resize-y rounded-2xl bg-slate-50 border-slate-200 focus-visible:ring-[#3131d8]"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      size="icon"
+                      className="h-12 w-12 rounded-full bg-[#121c34] hover:bg-[#121c34]/90 flex-shrink-0"
+                      disabled={!messageText.trim() || sendMessage.isPending}
+                    >
+                      {sendMessage.isPending ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Send className="w-5 h-5 ml-1" />
+                      )}
+                    </Button>
+                  </div>
                 </form>
               </div>
             </>
