@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -169,6 +169,15 @@ type PeerSummaryWithGuardian = {
     profilePicUrl?: string | null;
     email?: string | null;
   } | null;
+};
+type GuardianRequest = {
+  id: number;
+  studentId: number;
+  guardianEmail: string;
+  guardianUserId: number | null;
+  status: "pending" | "accepted" | "rejected" | "cancelled";
+  createdAt: string;
+  updatedAt: string;
 };
 function jitsiRoomName(appointmentId: number) {
   return `ezamu-session-${appointmentId}`;
@@ -428,7 +437,11 @@ export function StudentDashboardPage() {
   const [goalsFilter, setGoalsFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
   const [selectedItem, setSelectedItem] = useState<ActionItem | null>(null);
   const [completingId, setCompletingId] = useState<number | null>(null);
-
+  const [guardianInviteOpen, setGuardianInviteOpen] = useState(false);
+  const [guardianEmailInput, setGuardianEmailInput] = useState("");
+  const [guardianRequests, setGuardianRequests] = useState<GuardianRequest[]>([]);
+  const [isLoadingGuardianRequests, setIsLoadingGuardianRequests] = useState(false);
+  const [isSendingGuardianInvite, setIsSendingGuardianInvite] = useState(false);
   const handleMarkComplete = async (itemId: number) => {
     setCompletingId(itemId);
     try {
@@ -443,7 +456,67 @@ export function StudentDashboardPage() {
       setCompletingId(null);
     }
   };
+  const handleSendGuardianInvite = async () => {
+    const normalizedEmail = guardianEmailInput.trim().toLowerCase();
 
+    if (!normalizedEmail) {
+      toast({
+        title: "Email required",
+        description: "Please enter a guardian email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSendingGuardianInvite(true);
+
+    try {
+      const response = await fetch("/api/users/guardian-requests", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ guardianEmail: normalizedEmail }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to send guardian invite");
+      }
+
+      toast({
+        title: "Invite sent",
+        description: "Your guardian invitation has been sent.",
+      });
+
+      setGuardianInviteOpen(false);
+      setGuardianEmailInput("");
+
+      const refreshResponse = await fetch("/api/users/guardian-requests", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (refreshResponse.ok) {
+        const refreshed: GuardianRequest[] = await refreshResponse.json();
+        setGuardianRequests(refreshed);
+      }
+    } catch (error) {
+      toast({
+        title: "Could not send invite",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingGuardianInvite(false);
+    }
+  };
   const handleNudge = async (taskTitle?: string, taskId?: number) => {
     try {
       await sendNudge.mutateAsync(taskTitle);
@@ -511,7 +584,39 @@ export function StudentDashboardPage() {
       name: (firstWithCoach as any).coachName as string,
     };
   }, [appointments]);
+  useEffect(() => {
+    const loadGuardianRequests = async () => {
+      if (!user || user.role !== "student") return;
 
+      setIsLoadingGuardianRequests(true);
+      try {
+        const response = await fetch("/api/users/guardian-requests", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load guardian requests");
+        }
+
+        const data: GuardianRequest[] = await response.json();
+        setGuardianRequests(data);
+      } catch {
+        toast({
+          title: "Could not load guardian invite status",
+          description: "Please refresh and try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingGuardianRequests(false);
+      }
+    };
+
+    loadGuardianRequests();
+  }, [user, toast]);
   if (isLoading) {
     return (
       <MainLayout>
@@ -532,6 +637,12 @@ export function StudentDashboardPage() {
     approved: smartGoals.filter(g => g.status === "approved").length,
     denied: smartGoals.filter(g => g.status === "denied").length,
   };
+  const pendingGuardianRequest = guardianRequests.find(
+    (request) => request.status === "pending"
+  );
+
+  const hasGuardianConnected = !!peerSummaryWithGuardian?.guardian;
+
 
   return (
     <MainLayout>
@@ -938,114 +1049,136 @@ export function StudentDashboardPage() {
               </Card>
 
               {/* Triad Team */}
-              {(peerSummary || triadCoach || peerSummaryWithGuardian?.guardian) && (
-                <Card className="shadow-sm border-none">
-                  <CardHeader className="border-b bg-slate-50/50 pb-4">
-                    <div>
-                      <CardTitle className="text-lg font-serif text-[#121c34] flex items-center gap-2">
-                        <Users className="w-4 h-4 text-[#3131d8]" />
-                        Your Triad
-                      </CardTitle>
-                      <CardDescription className="mt-0.5">
-                        Your connected guardian, coach, and peer
-                      </CardDescription>
-                    </div>
-                  </CardHeader>
+              <Card className="shadow-sm border-none">
+                <CardHeader className="border-b bg-slate-50/50 pb-4">
+                  <div>
+                    <CardTitle className="text-lg font-serif text-[#121c34] flex items-center gap-2">
+                      <Users className="w-4 h-4 text-[#3131d8]" />
+                      Your Triad
+                    </CardTitle>
+                    <CardDescription className="mt-0.5">
+                      Your connected guardian, coach, and peer
+                    </CardDescription>
+                  </div>
+                </CardHeader>
 
-                  <CardContent className="pt-4 pb-4 space-y-4">
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="rounded-xl border bg-slate-50/50 p-4">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                          Guardian
-                        </p>
+                <CardContent className="pt-4 pb-4 space-y-4">
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="rounded-xl border bg-slate-50/50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Guardian
+                      </p>
 
-                        {peerSummaryWithGuardian?.guardian ? (
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
-                              <AvatarImage src={peerSummaryWithGuardian.guardian.profilePicUrl ?? undefined} />
-                              <AvatarFallback className="bg-[#607b7d] text-white text-sm font-semibold">
-                                {peerSummaryWithGuardian.guardian.firstName[0]}
-                                {peerSummaryWithGuardian.guardian.lastName[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-semibold text-[#121c34] text-sm">
-                                {peerSummaryWithGuardian.guardian.firstName} {peerSummaryWithGuardian.guardian.lastName}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Assigned guardian
-                              </p>
-                            </div>
+                      {hasGuardianConnected ? (
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
+                            <AvatarImage
+                              src={peerSummaryWithGuardian.guardian?.profilePicUrl ?? undefined}
+                            />
+                            <AvatarFallback className="bg-[#607b7d] text-white text-sm font-semibold">
+                              {peerSummaryWithGuardian.guardian?.firstName?.[0]}
+                              {peerSummaryWithGuardian.guardian?.lastName?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold text-[#121c34] text-sm">
+                              {peerSummaryWithGuardian.guardian?.firstName}{" "}
+                              {peerSummaryWithGuardian.guardian?.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Assigned guardian
+                            </p>
                           </div>
-                        ) : (
+                        </div>
+                      ) : pendingGuardianRequest ? (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                          <p className="text-sm font-medium text-amber-700">
+                            Invite pending
+                          </p>
+                          <p className="text-xs text-amber-700/80 mt-1 break-all">
+                            {pendingGuardianRequest.guardianEmail}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
                           <p className="text-sm text-muted-foreground">
                             No guardian is connected.
                           </p>
-                        )}
-                      </div>
-
-                      <div className="rounded-xl border bg-slate-50/50 p-4">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                          Coach
-                        </p>
-
-                        {triadCoach ? (
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
-                              <AvatarFallback className="bg-[#607b7d] text-white text-sm font-semibold">
-                                {triadCoach.name.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-semibold text-[#121c34] text-sm">
-                                {triadCoach.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Assigned coach
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            No coach is connected.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="rounded-xl border bg-slate-50/50 p-4">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                          Peer
-                        </p>
-
-                        {peerSummary ? (
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
-                              <AvatarImage src={peerSummary.peer.profilePicUrl ?? undefined} />
-                              <AvatarFallback className="bg-[#121c34] text-white text-sm font-semibold">
-                                {peerSummary.peer.firstName[0]}{peerSummary.peer.lastName[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-semibold text-[#121c34] text-sm">
-                                {peerSummary.peer.firstName} {peerSummary.peer.lastName}
-                              </p>
-                              {peerSummary.peer.innerHeroArchetype && (
-                                <p className="text-xs text-muted-foreground capitalize">
-                                  {peerSummary.peer.innerHeroArchetype}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            No peer is connected.
-                          </p>
-                        )}
-                      </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setGuardianInviteOpen(true)}
+                            disabled={isLoadingGuardianRequests}
+                            className="border-dashed"
+                          >
+                            Invite Guardian
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+
+                    <div className="rounded-xl border bg-slate-50/50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Coach
+                      </p>
+
+                      {triadCoach ? (
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
+                            <AvatarFallback className="bg-[#607b7d] text-white text-sm font-semibold">
+                              {triadCoach.name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold text-[#121c34] text-sm">
+                              {triadCoach.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Assigned coach
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No coach is connected.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="rounded-xl border bg-slate-50/50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Peer
+                      </p>
+
+                      {peerSummary ? (
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 ring-2 ring-[#3131d8]/10">
+                            <AvatarImage src={peerSummary.peer.profilePicUrl ?? undefined} />
+                            <AvatarFallback className="bg-[#121c34] text-white text-sm font-semibold">
+                              {peerSummary.peer.firstName[0]}{peerSummary.peer.lastName[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold text-[#121c34] text-sm">
+                              {peerSummary.peer.firstName} {peerSummary.peer.lastName}
+                            </p>
+                            {peerSummary.peer.innerHeroArchetype && (
+                              <p className="text-xs text-muted-foreground capitalize">
+                                {peerSummary.peer.innerHeroArchetype}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No peer is connected.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
 
               {/* Assessment Teaser */}
               {!user?.innerHeroArchetype && (
@@ -1348,6 +1481,65 @@ export function StudentDashboardPage() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={guardianInviteOpen}
+        onOpenChange={(open) => {
+          setGuardianInviteOpen(open);
+          if (!open) {
+            setGuardianEmailInput("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#121c34] font-serif text-xl">
+              Invite Guardian
+            </DialogTitle>
+            <DialogDescription>
+              Enter your guardian’s email address to send them an invitation.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="guardian-email">Guardian Email</Label>
+              <Input
+                id="guardian-email"
+                type="email"
+                placeholder="guardian@email.com"
+                value={guardianEmailInput}
+                onChange={(e) => setGuardianEmailInput(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                onClick={handleSendGuardianInvite}
+                disabled={isSendingGuardianInvite}
+                className="bg-[#3131d8] hover:bg-[#3131d8]/90 text-white border-none"
+              >
+                {isSendingGuardianInvite ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  "Send Invite"
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setGuardianInviteOpen(false);
+                  setGuardianEmailInput("");
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </MainLayout>

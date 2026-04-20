@@ -8,3 +8,4 @@ export * from "./messages";
 export * from "./smart-goals";
 export * from "./coach-notes";
 export * from "./peer-requests";
+export * from "./guardian-requests";

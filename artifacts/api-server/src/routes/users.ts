@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, and, isNull } from "drizzle-orm";
+import { eq, ilike, or, and } from "drizzle-orm";
 import {
   actionItemsTable,
   appointmentsTable,
@@ -7,6 +7,7 @@ import {
   coachAvailabilityTable,
   coachNotesTable,
   db,
+  guardianRequestsTable,
   messagesTable,
   notificationsTable,
   peerRequestsTable,
@@ -588,7 +589,275 @@ router.post("/users/assign-guardian", requireAuth, async (req, res): Promise<voi
 
   res.json({ message: "Guardian assigned successfully" });
 });
+router.post("/users/guardian-requests", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const student = await getOrCreateUser(clerkId);
 
+  if (!student || student.role !== "student") {
+    res.status(403).json({ error: "Only students can invite guardians" });
+    return;
+  }
+
+  const { guardianEmail } = req.body ?? {};
+
+  if (!guardianEmail || typeof guardianEmail !== "string") {
+    res.status(400).json({ error: "guardianEmail is required" });
+    return;
+  }
+
+  const normalizedEmail = guardianEmail.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    res.status(400).json({ error: "guardianEmail is required" });
+    return;
+  }
+
+  if (normalizedEmail === student.email.toLowerCase()) {
+    res.status(400).json({ error: "You cannot invite your own email as guardian" });
+    return;
+  }
+
+  if (student.guardianId) {
+    res.status(400).json({ error: "A guardian is already connected to this student" });
+    return;
+  }
+
+  const [existingGuardianUser] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, normalizedEmail));
+
+  if (existingGuardianUser && existingGuardianUser.role !== "guardian") {
+    res.status(400).json({ error: "That email already belongs to a non-guardian account" });
+    return;
+  }
+
+  const [existingPending] = await db
+    .select()
+    .from(guardianRequestsTable)
+    .where(
+      and(
+        eq(guardianRequestsTable.studentId, student.id),
+        eq(guardianRequestsTable.guardianEmail, normalizedEmail),
+        eq(guardianRequestsTable.status, "pending"),
+      )
+    );
+
+  if (existingPending) {
+    res.status(409).json({ error: "A pending guardian invite already exists for that email" });
+    return;
+  }
+
+  const [created] = await db
+    .insert(guardianRequestsTable)
+    .values({
+      studentId: student.id,
+      guardianEmail: normalizedEmail,
+      guardianUserId: existingGuardianUser?.id ?? null,
+      status: "pending",
+    })
+    .returning();
+
+  if (existingGuardianUser?.id) {
+    await db.insert(notificationsTable).values({
+      userId: existingGuardianUser.id,
+      type: "guardian_invite",
+      message: `${student.firstName} ${student.lastName} invited you to connect as their guardian.`,
+      relatedId: created.id,
+      read: false,
+    });
+  }
+
+  res.status(201).json({
+    ...created,
+    createdAt: created.createdAt.toISOString(),
+    updatedAt: created.updatedAt.toISOString(),
+  });
+});
+router.get("/users/guardian-requests", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const me = await getOrCreateUser(clerkId);
+
+  if (!me) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  if (me.role === "student") {
+    const requests = await db
+      .select()
+      .from(guardianRequestsTable)
+      .where(eq(guardianRequestsTable.studentId, me.id));
+
+    res.json(
+      requests.map((r) => ({
+        ...r,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+      }))
+    );
+    return;
+  }
+
+  if (me.role === "guardian") {
+    const requests = await db
+      .select()
+      .from(guardianRequestsTable)
+      .where(eq(guardianRequestsTable.guardianEmail, me.email.toLowerCase()));
+
+    const studentIds = [...new Set(requests.map((r) => r.studentId))];
+    const students =
+      studentIds.length > 0
+        ? await db.select().from(usersTable).where(or(...studentIds.map((id) => eq(usersTable.id, id))))
+        : [];
+
+    const studentsById = Object.fromEntries(students.map((s) => [s.id, s]));
+
+    res.json(
+      requests.map((r) => ({
+        ...r,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+        student: studentsById[r.studentId]
+          ? {
+            id: studentsById[r.studentId].id,
+            firstName: studentsById[r.studentId].firstName,
+            lastName: studentsById[r.studentId].lastName,
+            email: studentsById[r.studentId].email,
+            profilePicUrl: studentsById[r.studentId].profilePicUrl,
+          }
+          : null,
+      }))
+    );
+    return;
+  }
+
+  res.status(403).json({ error: "Only students and guardians can view guardian requests" });
+});
+router.patch("/users/guardian-requests/:id", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const me = await getOrCreateUser(clerkId);
+
+  if (!me) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  if (me.role !== "guardian") {
+    res.status(403).json({ error: "Only guardians can respond to guardian requests" });
+    return;
+  }
+
+  const rawRequestId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const requestId = parseInt(rawRequestId, 10);
+  const { status } = req.body ?? {};
+
+  if (isNaN(requestId)) {
+    res.status(400).json({ error: "Invalid request id" });
+    return;
+  }
+
+  if (!["accepted", "rejected"].includes(status)) {
+    res.status(400).json({ error: "Status must be accepted or rejected" });
+    return;
+  }
+
+  const [request] = await db
+    .select()
+    .from(guardianRequestsTable)
+    .where(eq(guardianRequestsTable.id, requestId));
+
+  if (!request) {
+    res.status(404).json({ error: "Guardian request not found" });
+    return;
+  }
+
+  if (request.guardianEmail.toLowerCase() !== me.email.toLowerCase()) {
+    res.status(403).json({ error: "This request is not for your account" });
+    return;
+  }
+
+  if (request.status !== "pending") {
+    res.status(400).json({ error: "This guardian request has already been handled" });
+    return;
+  }
+
+  const [student] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, request.studentId));
+
+  if (!student || student.role !== "student") {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
+
+  if (status === "accepted") {
+    await db.transaction(async (tx) => {
+      if (student.guardianId && student.guardianId !== me.id) {
+        await tx
+          .update(usersTable)
+          .set({ studentId: null })
+          .where(eq(usersTable.id, student.guardianId));
+      }
+
+      if (me.studentId && me.studentId !== student.id) {
+        await tx
+          .update(usersTable)
+          .set({ guardianId: null })
+          .where(eq(usersTable.id, me.studentId));
+      }
+
+      await tx
+        .update(usersTable)
+        .set({ guardianId: me.id })
+        .where(eq(usersTable.id, student.id));
+
+      await tx
+        .update(usersTable)
+        .set({ studentId: student.id })
+        .where(eq(usersTable.id, me.id));
+
+      await tx
+        .update(guardianRequestsTable)
+        .set({
+          status: "accepted",
+          guardianUserId: me.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(guardianRequestsTable.id, request.id));
+
+      await tx
+        .update(guardianRequestsTable)
+        .set({
+          status: "rejected",
+          guardianUserId: me.id,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(guardianRequestsTable.guardianEmail, me.email.toLowerCase()),
+            eq(guardianRequestsTable.studentId, student.id),
+            eq(guardianRequestsTable.status, "pending"),
+          )
+        );
+    });
+
+    res.json({ message: "Guardian request accepted successfully" });
+    return;
+  }
+
+  await db
+    .update(guardianRequestsTable)
+    .set({
+      status: "rejected",
+      guardianUserId: me.id,
+      updatedAt: new Date(),
+    })
+    .where(eq(guardianRequestsTable.id, request.id));
+
+  res.json({ message: "Guardian request rejected" });
+});
 router.post("/users/remove-guardian", requireAuth, async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const coach = await getOrCreateUser(clerkId);
