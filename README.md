@@ -112,3 +112,12 @@ tsconfig.json
 - **Guardian**: read-only view of their student's dashboard
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Recent Updates
+- changing the sign-up wording from “Students” to “Student/Peers”
+- adding sign-up pop-ups with customized getting started guidance for students/peers and for coaches to improve navigation
+- adding a small description for each “inner hero” option in the assessment so students have more context when ranking them
+- adding a “Triad Team” section on the student dashboard for easy access
+- updating the assessment page so that if a student has already completed the assessment, their results are shown first, along with a button at the bottom allowing them to retake it if they choose
+- peers are strictly accountability partners and will no longer be counted as students that will receive coaching
+- parents get an invite link to sign up
