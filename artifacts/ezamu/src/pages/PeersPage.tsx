@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,10 @@ import {
   BookOpen,
   UserCheck,
   Mail,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -59,6 +63,18 @@ const ARCHETYPE_COLORS: Record<string, string> = {
   caregiver: "bg-rose-50 text-rose-700 border-rose-200",
   default: "bg-slate-50 text-slate-700 border-slate-200",
 };
+
+const STUDENT_INTERESTS = [
+  "Science & Math",
+  "Coding & Tech",
+  "Arts & Design",
+  "Writing & Literature",
+  "Business & Finance",
+  "Healthcare",
+  "Psychology",
+  "Engineering",
+  "Music & Performance",
+];
 
 function archetypeColor(archetype: string | null) {
   if (!archetype) return ARCHETYPE_COLORS.default;
@@ -98,6 +114,14 @@ export function PeersPage() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assigningStudentId, setAssigningStudentId] = useState<number | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
+  const [expertiseFilterOpen, setExpertiseFilterOpen] = useState(false);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const filterDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  const PEERS_PER_PAGE = 9;
+
+  const interestOptions = STUDENT_INTERESTS;
 
   useEffect(() => {
     if (!isCoach) return;
@@ -137,15 +161,6 @@ export function PeersPage() {
     };
   }, [isCoach]);
 
-  if (loadingMe) {
-    return (
-      <MainLayout>
-        <div className="flex justify-center items-center h-[60vh]">
-          <Loader2 className="w-8 h-8 animate-spin text-[#3131d8]" />
-        </div>
-      </MainLayout>
-    );
-  }
   const filtered = students.filter((s) => {
     const name = `${s.firstName} ${s.lastName}`.toLowerCase();
     const q = search.toLowerCase();
@@ -156,16 +171,56 @@ export function PeersPage() {
     );
   });
 
-  const filteredCoachPeers = availablePeers.filter((p) => {
+  const filteredCoachPeers = useMemo(() => {
     const q = search.toLowerCase();
-    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-    return (
-      name.includes(q) ||
-      p.bio.toLowerCase().includes(q) ||
-      p.fieldsOfInterest.some((f) => f.toLowerCase().includes(q)) ||
-      p.fieldsOfExpertise.some((f) => f.toLowerCase().includes(q))
+
+    return availablePeers.filter((p) => {
+      const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+
+      const matchesSearch =
+        name.includes(q) ||
+        (p.bio ?? "").toLowerCase().includes(q) ||
+        (p.fieldsOfInterest ?? []).some((f) => f.toLowerCase().includes(q)) ||
+        (p.fieldsOfExpertise ?? []).some((f) => f.toLowerCase().includes(q));
+
+      const matchesInterests =
+        selectedInterests.length === 0 ||
+        selectedInterests.some((interest) =>
+          (p.fieldsOfInterest ?? []).includes(interest)
+        );
+
+      return matchesSearch && matchesInterests;
+    });
+  }, [availablePeers, search, selectedInterests]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCoachPeers.length / PEERS_PER_PAGE));
+
+  const paginatedCoachPeers = useMemo(() => {
+    const start = (currentPage - 1) * PEERS_PER_PAGE;
+    return filteredCoachPeers.slice(start, start + PEERS_PER_PAGE);
+  }, [filteredCoachPeers, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedInterests]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const toggleInterests = (value: string) => {
+    setSelectedInterests((prev) =>
+      prev.includes(value)
+        ? prev.filter((item) => item !== value)
+        : [...prev, value]
     );
-  });
+  };
+
+  const clearInterestsFilters = () => {
+    setSelectedInterests([]);
+  };
 
   const incoming = requests.filter((r) => r.direction === "received" && r.status === "pending");
   const outgoing = requests.filter((r) => r.direction === "sent");
@@ -234,6 +289,33 @@ export function PeersPage() {
 
   const pendingCount = incoming.length;
 
+  useEffect(() => {
+    if (!expertiseFilterOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        filterDropdownRef.current &&
+        !filterDropdownRef.current.contains(event.target as Node)
+      ) {
+        setExpertiseFilterOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [expertiseFilterOpen]);
+
+  if (loadingMe) {
+    return (
+      <MainLayout>
+        <div className="flex justify-center items-center h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#3131d8]" />
+        </div>
+      </MainLayout>
+    );
+  }
   return (
     <MainLayout>
       <div className="flex-1 bg-slate-50 pb-12">
@@ -253,7 +335,7 @@ export function PeersPage() {
           </div>
         </div>
 
-        <div className="container mx-auto max-w-4xl px-4 -mt-16 space-y-5">
+        <div className="container mx-auto max-w-4xl px-4 -mt-11 space-y-6">
           {successMessage && (
             <div className="bg-green-100 text-green-700 p-3 rounded-xl text-sm border border-green-200">
               {successMessage}
@@ -287,19 +369,118 @@ export function PeersPage() {
             </div>
           )}
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={
-                isCoach
-                  ? "Search available peers by name, bio, or interest..."
-                  : "Search by name, archetype, or interest..."
-              }
-              className="pl-9 bg-white border-slate-200"
-            />
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={
+                  isCoach
+                    ? "Search available peers by name, bio, or interest..."
+                    : "Search by name, archetype, or interest..."
+                }
+                className="pl-9 bg-white border-slate-200"
+              />
+            </div>
+
+            {isCoach && (
+              <div className="relative" ref={filterDropdownRef}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto bg-white border-slate-200"
+                  onClick={() => setExpertiseFilterOpen((prev) => !prev)}
+                >
+                  <SlidersHorizontal className="w-4 h-4 mr-2" />
+                  Filter
+                  {selectedInterests.length > 0 && (
+                    <span className="ml-2 rounded-full bg-[#3131d8] text-white text-[10px] px-2 py-0.5">
+                      {selectedInterests.length}
+                    </span>
+                  )}
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+
+                {expertiseFilterOpen && (
+                  <div className="absolute right-0 top-full mt-3 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-[#121c34]">Areas of Interest</p>
+                      {selectedInterests.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={clearInterestsFilters}
+                          className="text-xs text-[#3131d8] hover:underline"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto space-y-2">
+                      {interestOptions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No interest options found.</p>
+                      ) : (
+                        interestOptions.map((option) => {
+                          const checked = selectedInterests.includes(option);
+
+                          return (
+                            <label
+                              key={option}
+                              className="flex items-center gap-2 text-sm text-[#121c34] cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleInterests(option)}
+                                className="rounded border-slate-300"
+                              />
+                              <span>{option}</span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+          {isCoach && selectedInterests.length > 0 && (
+            <div className="bg-white/80 border border-slate-200 rounded-xl px-3 py-3 shadow-sm">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Active Filters
+                </p>
+                <button
+                  type="button"
+                  onClick={clearInterestsFilters}
+                  className="text-xs text-[#3131d8] hover:underline"
+                >
+                  Clear all
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {selectedInterests.map((item) => (
+                  <Badge
+                    key={item}
+                    variant="secondary"
+                    className="bg-[#3131d8]/10 text-[#3131d8] border border-[#3131d8]/20 gap-1 px-2.5 py-1"
+                  >
+                    {item}
+                    <button
+                      type="button"
+                      onClick={() => toggleInterests(item)}
+                      className="ml-1 hover:text-[#121c34]"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
 
           {isCoach ? (
             loadingPeers ? (
@@ -315,62 +496,94 @@ export function PeersPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {filteredCoachPeers.map((peer) => (
-                  <button
-                    key={peer.id}
-                    type="button"
-                    onClick={() => setSelectedPeer(peer)}
-                    className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col gap-4 hover:shadow-md transition-shadow text-left"
-                  >
-                    <div className="flex items-start gap-4">
-                      <Avatar className="h-14 w-14 ring-2 ring-slate-100">
-                        <AvatarImage src={peer.profilePicUrl ?? undefined} />
-                        <AvatarFallback className="bg-[#121c34] text-white font-semibold">
-                          {peer.firstName?.[0] ?? "?"}{peer.lastName?.[0] ?? "?"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-[#121c34]">
-                          {peer.firstName} {peer.lastName}
-                        </p>
-                        {peer.bio?.trim() && (
-                          <p className="text-xs text-muted-foreground mt-1.5 line-clamp-3">
-                            {peer.bio}
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {paginatedCoachPeers.map((peer) => (
+                    <button
+                      key={peer.id}
+                      type="button"
+                      onClick={() => setSelectedPeer(peer)}
+                      className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col gap-4 hover:shadow-md transition-shadow text-left"
+                    >
+                      <div className="flex items-start gap-4">
+                        <Avatar className="h-14 w-14 ring-2 ring-slate-100">
+                          <AvatarImage src={peer.profilePicUrl ?? undefined} />
+                          <AvatarFallback className="bg-[#121c34] text-white font-semibold">
+                            {peer.firstName?.[0] ?? "?"}{peer.lastName?.[0] ?? "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-[#121c34]">
+                            {peer.firstName} {peer.lastName}
                           </p>
-                        )}
+                          {peer.bio?.trim() && (
+                            <p className="text-xs text-muted-foreground mt-1.5 line-clamp-3">
+                              {peer.bio}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    {(peer.fieldsOfInterest ?? []).length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {(peer.fieldsOfInterest ?? []).slice(0, 3).map((f) => (
-                          <span
-                            key={f}
-                            className="text-[10px] font-medium bg-slate-100 text-slate-600 rounded-full px-2 py-0.5"
-                          >
-                            {f}
-                          </span>
-                        ))}
-                        {(peer.fieldsOfInterest ?? []).length > 3 && (
-                          <span className="text-[10px] text-muted-foreground px-1 py-0.5">
-                            +{(peer.fieldsOfInterest ?? []).length - 3} more
-                          </span>
-                        )}
+                      {(peer.fieldsOfInterest ?? []).length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {(peer.fieldsOfInterest ?? []).slice(0, 3).map((f) => (
+                            <span
+                              key={f}
+                              className="text-[10px] font-medium bg-slate-100 text-slate-600 rounded-full px-2 py-0.5"
+                            >
+                              {f}
+                            </span>
+                          ))}
+                          {(peer.fieldsOfInterest ?? []).length > 3 && (
+                            <span className="text-[10px] text-muted-foreground px-1 py-0.5">
+                              +{(peer.fieldsOfInterest ?? []).length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-50">
+                        <span className="text-xs text-[#3131d8] font-medium">
+                          View Profile
+                        </span>
+                        <Badge className="bg-blue-50 text-blue-700 border border-blue-200 text-xs">
+                          Available
+                        </Badge>
                       </div>
-                    )}
+                    </button>
+                  ))}
+                </div>
 
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-50">
-                      <span className="text-xs text-[#3131d8] font-medium">
-                        View Profile
-                      </span>
-                      <Badge className="bg-blue-50 text-blue-700 border border-blue-200 text-xs">
-                        Available
-                      </Badge>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      Prev
+                    </Button>
+
+                    <span className="text-sm text-muted-foreground px-2">
+                      Page {currentPage} of {totalPages}
+                    </span>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </div>
+                )}
+              </>
             )
           ) : activeTab === "browse" ? (
             loadingStudents ? (
@@ -552,246 +765,252 @@ export function PeersPage() {
         </div>
       </div>
 
-      {profileStudent && !isCoach && (
-        <Dialog open onOpenChange={() => setProfileStudent(null)}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <div className="flex flex-col items-center gap-3 pt-2">
-                <Avatar className="h-20 w-20 ring-4 ring-[#3131d8]/10">
-                  <AvatarImage src={profileStudent.profilePicUrl ?? undefined} />
-                  <AvatarFallback className="bg-[#121c34] text-white text-2xl">
-                    {profileStudent.firstName[0]}{profileStudent.lastName[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="text-center">
-                  <DialogTitle className="text-[#121c34]">
-                    {profileStudent.firstName} {profileStudent.lastName}
-                  </DialogTitle>
-                  {profileStudent.innerHeroArchetype && (
-                    <Badge className={`mt-1 border ${archetypeColor(profileStudent.innerHeroArchetype)}`}>
-                      <Star className="w-3 h-3 mr-1" />
-                      {profileStudent.innerHeroArchetype}
-                    </Badge>
-                  )}
+      {
+        profileStudent && !isCoach && (
+          <Dialog open onOpenChange={() => setProfileStudent(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <div className="flex flex-col items-center gap-3 pt-2">
+                  <Avatar className="h-20 w-20 ring-4 ring-[#3131d8]/10">
+                    <AvatarImage src={profileStudent.profilePicUrl ?? undefined} />
+                    <AvatarFallback className="bg-[#121c34] text-white text-2xl">
+                      {profileStudent.firstName[0]}{profileStudent.lastName[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-center">
+                    <DialogTitle className="text-[#121c34]">
+                      {profileStudent.firstName} {profileStudent.lastName}
+                    </DialogTitle>
+                    {profileStudent.innerHeroArchetype && (
+                      <Badge className={`mt-1 border ${archetypeColor(profileStudent.innerHeroArchetype)}`}>
+                        <Star className="w-3 h-3 mr-1" />
+                        {profileStudent.innerHeroArchetype}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </DialogHeader>
+              </DialogHeader>
 
-            {(() => {
-              const partnerEmail = profileStudent.requestStatus === "accepted"
-                ? (accepted.find((r) =>
-                  r.fromUserId === profileStudent.id || r.toUserId === profileStudent.id
-                )?.fromUserId === profileStudent.id
-                  ? accepted.find((r) => r.fromUserId === profileStudent.id || r.toUserId === profileStudent.id)?.fromUser?.email
-                  : accepted.find((r) => r.fromUserId === profileStudent.id || r.toUserId === profileStudent.id)?.toUser?.email)
-                : undefined;
+              {(() => {
+                const partnerEmail = profileStudent.requestStatus === "accepted"
+                  ? (accepted.find((r) =>
+                    r.fromUserId === profileStudent.id || r.toUserId === profileStudent.id
+                  )?.fromUserId === profileStudent.id
+                    ? accepted.find((r) => r.fromUserId === profileStudent.id || r.toUserId === profileStudent.id)?.fromUser?.email
+                    : accepted.find((r) => r.fromUserId === profileStudent.id || r.toUserId === profileStudent.id)?.toUser?.email)
+                  : undefined;
 
-              return (
-                <div className="space-y-4 py-2">
-                  {profileStudent.bio && (
-                    <p className="text-sm text-muted-foreground text-center leading-relaxed">{profileStudent.bio}</p>
-                  )}
+                return (
+                  <div className="space-y-4 py-2">
+                    {profileStudent.bio && (
+                      <p className="text-sm text-muted-foreground text-center leading-relaxed">{profileStudent.bio}</p>
+                    )}
 
-                  {partnerEmail && (
-                    <div className="flex items-center justify-center">
-                      <a
-                        href={`mailto:${partnerEmail}`}
-                        className="flex items-center gap-2 text-sm text-[#3131d8] hover:underline bg-[#3131d8]/5 border border-[#3131d8]/20 rounded-full px-4 py-1.5"
-                      >
-                        <Mail className="w-4 h-4 flex-shrink-0" />
-                        {partnerEmail}
-                      </a>
-                    </div>
-                  )}
-
-                  {profileStudent.fieldsOfInterest.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2 flex items-center gap-1">
-                        <BookOpen className="w-3.5 h-3.5" /> Fields of Interest
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {profileStudent.fieldsOfInterest.map((f) => (
-                          <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>
-                        ))}
+                    {partnerEmail && (
+                      <div className="flex items-center justify-center">
+                        <a
+                          href={`mailto:${partnerEmail}`}
+                          className="flex items-center gap-2 text-sm text-[#3131d8] hover:underline bg-[#3131d8]/5 border border-[#3131d8]/20 rounded-full px-4 py-1.5"
+                        >
+                          <Mail className="w-4 h-4 flex-shrink-0" />
+                          {partnerEmail}
+                        </a>
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+                    )}
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setProfileStudent(null)}>Close</Button>
-              {profileStudent.requestStatus === null && (
-                <Button
-                  className="bg-[#3131d8] hover:bg-[#3131d8]/90 text-white gap-2"
-                  onClick={() => handleSend(profileStudent)}
-                  disabled={sendRequest.isPending}
-                >
-                  {sendRequest.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                  Send Peer Request
-                </Button>
-              )}
-              {profileStudent.requestStatus === "pending" && profileStudent.requestDirection === "sent" && (
-                <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Request Pending</Badge>
-              )}
-              {profileStudent.requestStatus === "accepted" && (
-                <Badge className="bg-green-50 text-green-700 border border-green-200">Already Partners</Badge>
-              )}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {selectedPeer && isCoach && (
-        <Dialog open onOpenChange={(open) => !open && setSelectedPeer(null)}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <div className="flex flex-col items-center gap-3 pt-2">
-                <Avatar className="h-20 w-20 ring-4 ring-[#3131d8]/10">
-                  <AvatarImage src={selectedPeer.profilePicUrl ?? undefined} />
-                  <AvatarFallback className="bg-[#121c34] text-white text-2xl">
-                    {selectedPeer.firstName?.[0] ?? "?"}{selectedPeer.lastName?.[0] ?? "?"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="text-center">
-                  <DialogTitle className="text-[#121c34]">
-                    {selectedPeer.firstName} {selectedPeer.lastName}
-                  </DialogTitle>
-                </div>
-              </div>
-            </DialogHeader>
-
-            <div className="space-y-4 py-2">
-              {selectedPeer.bio && (
-                <p className="text-sm text-muted-foreground text-center leading-relaxed">
-                  {selectedPeer.bio}
-                </p>
-              )}
-
-              {selectedPeer.email && (
-                <div className="flex items-center justify-center">
-                  <a
-                    href={`mailto:${selectedPeer.email}`}
-                    className="flex items-center gap-2 text-sm text-[#3131d8] hover:underline bg-[#3131d8]/5 border border-[#3131d8]/20 rounded-full px-4 py-1.5"
-                  >
-                    <Mail className="w-4 h-4 flex-shrink-0" />
-                    {selectedPeer.email}
-                  </a>
-                </div>
-              )}
-
-              {(selectedPeer.fieldsOfInterest ?? []).length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <BookOpen className="w-3.5 h-3.5" /> Fields of Interest
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {(selectedPeer.fieldsOfInterest ?? []).map((f) => (
-                      <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>
-                    ))}
+                    {profileStudent.fieldsOfInterest.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2 flex items-center gap-1">
+                          <BookOpen className="w-3.5 h-3.5" /> Fields of Interest
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {profileStudent.fieldsOfInterest.map((f) => (
+                            <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
-              {(selectedPeer.fieldsOfExpertise ?? []).length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2">
-                    Areas of Expertise
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {(selectedPeer.fieldsOfExpertise ?? []).map((f) => (
-                      <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <DialogFooter>
-              <div className="w-full flex justify-center gap-3">
-                {isCoach && (
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setProfileStudent(null)}>Close</Button>
+                {profileStudent.requestStatus === null && (
                   <Button
-                    className="bg-[#121c34] hover:bg-[#121c34]/90 text-white"
-                    onClick={() => setAssignDialogOpen(true)}
+                    className="bg-[#3131d8] hover:bg-[#3131d8]/90 text-white gap-2"
+                    onClick={() => handleSend(profileStudent)}
+                    disabled={sendRequest.isPending}
                   >
-                    Assign Peer
+                    {sendRequest.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                    Send Peer Request
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => setSelectedPeer(null)}>
-                  Close
-                </Button>
-              </div>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+                {profileStudent.requestStatus === "pending" && profileStudent.requestDirection === "sent" && (
+                  <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Request Pending</Badge>
+                )}
+                {profileStudent.requestStatus === "accepted" && (
+                  <Badge className="bg-green-50 text-green-700 border border-green-200">Already Partners</Badge>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )
+      }
 
-      {selectedPeer && isCoach && (
-        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="text-[#121c34]">
-                Assign {selectedPeer.firstName} {selectedPeer.lastName}
-              </DialogTitle>
-            </DialogHeader>
+      {
+        selectedPeer && isCoach && (
+          <Dialog open onOpenChange={(open) => !open && setSelectedPeer(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <div className="flex flex-col items-center gap-3 pt-2">
+                  <Avatar className="h-20 w-20 ring-4 ring-[#3131d8]/10">
+                    <AvatarImage src={selectedPeer.profilePicUrl ?? undefined} />
+                    <AvatarFallback className="bg-[#121c34] text-white text-2xl">
+                      {selectedPeer.firstName?.[0] ?? "?"}{selectedPeer.lastName?.[0] ?? "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-center">
+                    <DialogTitle className="text-[#121c34]">
+                      {selectedPeer.firstName} {selectedPeer.lastName}
+                    </DialogTitle>
+                  </div>
+                </div>
+              </DialogHeader>
 
-            <div className="max-h-[320px] overflow-y-auto pr-1 space-y-3">
-              {loadingCoachStudents ? (
-                <div className="flex justify-center py-10">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#3131d8]" />
-                </div>
-              ) : coachStudents.length === 0 ? (
-                <div className="text-center py-10 text-sm text-muted-foreground">
-                  You do not have any students to assign yet.
-                </div>
-              ) : (
-                coachStudents.map((student) => (
-                  <button
-                    key={student.id}
-                    type="button"
-                    onClick={() => handleAssignPeer(student.id)}
-                    disabled={assigningStudentId === student.id}
-                    className="w-full text-left rounded-xl border border-slate-200 p-4 hover:bg-slate-50 transition-colors disabled:opacity-60"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={student.profilePicUrl || undefined} />
-                        <AvatarFallback className="bg-[#607b7d]/20 text-[#607b7d] text-sm font-semibold">
-                          {student.firstName.charAt(0)}{student.lastName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-[#121c34]">
-                          {student.firstName} {student.lastName}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {student.nextAppointmentAt
-                            ? `Next: ${format(new Date(student.nextAppointmentAt), "MMM d")}`
-                            : student.lastAppointmentAt
-                              ? `Last met: ${format(new Date(student.lastAppointmentAt), "MMM d")}`
-                              : `${student.totalAppointments} session${student.totalAppointments !== 1 ? "s" : ""
-                              }`}
-                        </p>
-                      </div>
-                      <div className="text-sm font-medium text-[#3131d8]">
-                        {assigningStudentId === student.id ? "Assigning..." : "Assign"}
-                      </div>
+              <div className="space-y-4 py-2">
+                {selectedPeer.bio && (
+                  <p className="text-sm text-muted-foreground text-center leading-relaxed">
+                    {selectedPeer.bio}
+                  </p>
+                )}
+
+                {selectedPeer.email && (
+                  <div className="flex items-center justify-center">
+                    <a
+                      href={`mailto:${selectedPeer.email}`}
+                      className="flex items-center gap-2 text-sm text-[#3131d8] hover:underline bg-[#3131d8]/5 border border-[#3131d8]/20 rounded-full px-4 py-1.5"
+                    >
+                      <Mail className="w-4 h-4 flex-shrink-0" />
+                      {selectedPeer.email}
+                    </a>
+                  </div>
+                )}
+
+                {(selectedPeer.fieldsOfInterest ?? []).length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <BookOpen className="w-3.5 h-3.5" /> Fields of Interest
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedPeer.fieldsOfInterest ?? []).map((f) => (
+                        <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>
+                      ))}
                     </div>
-                  </button>
-                ))
-              )}
-            </div>
+                  </div>
+                )}
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
-                Cancel
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-    </MainLayout>
+                {(selectedPeer.fieldsOfExpertise ?? []).length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-[#121c34] uppercase tracking-wider mb-2">
+                      Areas of Expertise
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedPeer.fieldsOfExpertise ?? []).map((f) => (
+                        <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <div className="w-full flex justify-center gap-3">
+                  {isCoach && (
+                    <Button
+                      className="bg-[#121c34] hover:bg-[#121c34]/90 text-white"
+                      onClick={() => setAssignDialogOpen(true)}
+                    >
+                      Assign Peer
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => setSelectedPeer(null)}>
+                    Close
+                  </Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )
+      }
+
+      {
+        selectedPeer && isCoach && (
+          <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="text-[#121c34]">
+                  Assign {selectedPeer.firstName} {selectedPeer.lastName}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="max-h-[320px] overflow-y-auto pr-1 space-y-3">
+                {loadingCoachStudents ? (
+                  <div className="flex justify-center py-10">
+                    <Loader2 className="w-6 h-6 animate-spin text-[#3131d8]" />
+                  </div>
+                ) : coachStudents.length === 0 ? (
+                  <div className="text-center py-10 text-sm text-muted-foreground">
+                    You do not have any students to assign yet.
+                  </div>
+                ) : (
+                  coachStudents.map((student) => (
+                    <button
+                      key={student.id}
+                      type="button"
+                      onClick={() => handleAssignPeer(student.id)}
+                      disabled={assigningStudentId === student.id}
+                      className="w-full text-left rounded-xl border border-slate-200 p-4 hover:bg-slate-50 transition-colors disabled:opacity-60"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={student.profilePicUrl || undefined} />
+                          <AvatarFallback className="bg-[#607b7d]/20 text-[#607b7d] text-sm font-semibold">
+                            {student.firstName.charAt(0)}{student.lastName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-[#121c34]">
+                            {student.firstName} {student.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {student.nextAppointmentAt
+                              ? `Next: ${format(new Date(student.nextAppointmentAt), "MMM d")}`
+                              : student.lastAppointmentAt
+                                ? `Last met: ${format(new Date(student.lastAppointmentAt), "MMM d")}`
+                                : `${student.totalAppointments} session${student.totalAppointments !== 1 ? "s" : ""
+                                }`}
+                          </p>
+                        </div>
+                        <div className="text-sm font-medium text-[#3131d8]">
+                          {assigningStudentId === student.id ? "Assigning..." : "Assign"}
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )
+      }
+    </MainLayout >
   );
 }
 

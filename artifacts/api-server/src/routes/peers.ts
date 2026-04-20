@@ -102,18 +102,18 @@ router.get("/peer-requests", requireAuth, async (req, res): Promise<void> => {
   const users =
     userIds.length > 0
       ? await db
-          .select({
-            id: usersTable.id,
-            firstName: usersTable.firstName,
-            lastName: usersTable.lastName,
-            email: usersTable.email,
-            profilePicUrl: usersTable.profilePicUrl,
-            innerHeroArchetype: usersTable.innerHeroArchetype,
-            fieldsOfInterest: usersTable.fieldsOfInterest,
-            bio: usersTable.bio,
-          })
-          .from(usersTable)
-          .where(or(...userIds.map((id) => eq(usersTable.id, id))))
+        .select({
+          id: usersTable.id,
+          firstName: usersTable.firstName,
+          lastName: usersTable.lastName,
+          email: usersTable.email,
+          profilePicUrl: usersTable.profilePicUrl,
+          innerHeroArchetype: usersTable.innerHeroArchetype,
+          fieldsOfInterest: usersTable.fieldsOfInterest,
+          bio: usersTable.bio,
+        })
+        .from(usersTable)
+        .where(or(...userIds.map((id) => eq(usersTable.id, id))))
       : [];
 
   const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
@@ -213,7 +213,8 @@ router.patch("/peer-requests/:id", requireAuth, async (req, res): Promise<void> 
     return;
   }
 
-  const requestId = parseInt(req.params.id, 10);
+  const rawRequestId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const requestId = parseInt(rawRequestId, 10);
   const { status } = req.body;
 
   if (!["accepted", "rejected", "cancelled"].includes(status)) {
@@ -294,61 +295,137 @@ router.get("/peer/summary", requireAuth, async (req, res): Promise<void> => {
     res.status(404).json({ error: "User not found" });
     return;
   }
-  if (!me.peerId) {
-    res.status(200).json(null);
+
+  // STUDENT VIEW: return assigned peer summary
+  if (me.role === "student") {
+    if (!me.peerId) {
+      res.status(200).json(null);
+      return;
+    }
+
+    const [peer] = await db
+      .select({
+        id: usersTable.id,
+        firstName: usersTable.firstName,
+        lastName: usersTable.lastName,
+        profilePicUrl: usersTable.profilePicUrl,
+        innerHeroArchetype: usersTable.innerHeroArchetype,
+        fieldsOfInterest: usersTable.fieldsOfInterest,
+        bio: usersTable.bio,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, me.peerId));
+
+    if (!peer) {
+      res.status(200).json(null);
+      return;
+    }
+
+    const actionItems = await db
+      .select()
+      .from(actionItemsTable)
+      .where(eq(actionItemsTable.studentId, me.id));
+
+    const smartGoals = await db
+      .select({
+        id: smartGoalsTable.id,
+        title: smartGoalsTable.title,
+        status: smartGoalsTable.status,
+        timeBound: smartGoalsTable.timeBound,
+      })
+      .from(smartGoalsTable)
+      .where(eq(smartGoalsTable.studentId, me.id));
+
+    res.json({
+      peer,
+      actionItems: actionItems.map((i) => ({
+        id: i.id,
+        title: i.title,
+        description: i.description,
+        completed: i.completed,
+        createdAt: i.createdAt.toISOString(),
+      })),
+      smartGoals: smartGoals.map((g) => ({
+        id: g.id,
+        title: g.title,
+        status: g.status,
+        timeBound: g.timeBound,
+      })),
+    });
     return;
   }
 
-  const [peer] = await db
-    .select({
-      id: usersTable.id,
-      firstName: usersTable.firstName,
-      lastName: usersTable.lastName,
-      profilePicUrl: usersTable.profilePicUrl,
-      innerHeroArchetype: usersTable.innerHeroArchetype,
-      fieldsOfInterest: usersTable.fieldsOfInterest,
-      bio: usersTable.bio,
-    })
-    .from(usersTable)
-    .where(eq(usersTable.id, me.peerId));
+  // PEER VIEW: return assigned student summary
+  if (me.role === "peer") {
+    if (!me.studentId) {
+      res.status(200).json(null);
+      return;
+    }
 
-  if (!peer) {
-    res.status(200).json(null);
+    const [student] = await db
+      .select({
+        id: usersTable.id,
+        firstName: usersTable.firstName,
+        lastName: usersTable.lastName,
+        profilePicUrl: usersTable.profilePicUrl,
+        innerHeroArchetype: usersTable.innerHeroArchetype,
+        fieldsOfInterest: usersTable.fieldsOfInterest,
+        bio: usersTable.bio,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, me.studentId));
+
+    if (!student) {
+      res.status(200).json(null);
+      return;
+    }
+
+    const actionItems = await db
+      .select()
+      .from(actionItemsTable)
+      .where(eq(actionItemsTable.studentId, student.id));
+
+    const smartGoals = await db
+      .select({
+        id: smartGoalsTable.id,
+        title: smartGoalsTable.title,
+        status: smartGoalsTable.status,
+        specific: smartGoalsTable.specific,
+        measurable: smartGoalsTable.measurable,
+        achievable: smartGoalsTable.achievable,
+        relevant: smartGoalsTable.relevant,
+        timeBound: smartGoalsTable.timeBound,
+        coachFeedback: smartGoalsTable.coachFeedback,
+        createdAt: smartGoalsTable.createdAt,
+      })
+      .from(smartGoalsTable)
+      .where(eq(smartGoalsTable.studentId, student.id));
+    res.json({
+      peer: student,
+      actionItems: actionItems.map((i) => ({
+        id: i.id,
+        title: i.title,
+        description: i.description,
+        completed: i.completed,
+        createdAt: i.createdAt.toISOString(),
+      })),
+      smartGoals: smartGoals.map((g) => ({
+        id: g.id,
+        title: g.title,
+        status: g.status,
+        specific: g.specific,
+        measurable: g.measurable,
+        achievable: g.achievable,
+        relevant: g.relevant,
+        timeBound: g.timeBound,
+        coachFeedback: g.coachFeedback,
+        createdAt: g.createdAt.toISOString(),
+      })),
+    });
     return;
   }
 
-  const actionItems = await db
-    .select()
-    .from(actionItemsTable)
-    .where(eq(actionItemsTable.studentId, me.peerId));
-
-  const smartGoals = await db
-    .select({
-      id: smartGoalsTable.id,
-      title: smartGoalsTable.title,
-      status: smartGoalsTable.status,
-      timeBound: smartGoalsTable.timeBound,
-    })
-    .from(smartGoalsTable)
-    .where(eq(smartGoalsTable.studentId, me.peerId));
-
-  res.json({
-    peer,
-    actionItems: actionItems.map((i) => ({
-      id: i.id,
-      title: i.title,
-      description: i.description,
-      completed: i.completed,
-      createdAt: i.createdAt.toISOString(),
-    })),
-    smartGoals: smartGoals.map((g) => ({
-      id: g.id,
-      title: g.title,
-      status: g.status,
-      timeBound:
-        g.timeBound instanceof Date ? g.timeBound.toISOString() : g.timeBound,
-    })),
-  });
+  res.status(200).json(null);
 });
 
 router.post("/peer/nudge", requireAuth, async (req, res): Promise<void> => {
@@ -385,5 +462,85 @@ router.post("/peer/nudge", requireAuth, async (req, res): Promise<void> => {
     createdAt: notif.createdAt.toISOString(),
   });
 });
+
+// router.get("/available-peers", requireAuth, async (req, res): Promise<void> => {
+//   const clerkId = (req as any).clerkUserId as string;
+//   const me = await getOrCreateUser(clerkId);
+//   if (!me) {
+//     res.status(404).json({ error: "User not found" });
+//     return;
+//   }
+//   if (me.role !== "coach") {
+//     res.status(403).json({ error: "Only coaches can view available peers" });
+//     return;
+//   }
+//   const rawPeers = await db
+//     .select({
+//       id: usersTable.id,
+//       firstName: usersTable.firstName,
+//       lastName: usersTable.lastName,
+//       email: usersTable.email,
+//       profilePicUrl: usersTable.profilePicUrl,
+//       bio: usersTable.bio,
+//       age: usersTable.age,
+//       fieldsOfInterest: usersTable.fieldsOfInterest,
+//       fieldsOfExpertise: usersTable.fieldsOfExpertise,
+//     })
+//     .from(usersTable)
+//     .where(
+//       and(
+//         eq(usersTable.role, "peer"),
+//         eq(usersTable.onboardingCompleted, true)
+//       )
+//     );
+//   res.json(
+//     rawPeers.map((peer) => ({
+//       ...peer,
+//       name: `${peer.firstName} ${peer.lastName}`.trim(),
+//     }))
+//   );
+// });
+// router.post("/assign-peer", requireAuth, async (req, res): Promise<void> => {
+//   const clerkId = (req as any).clerkUserId as string;
+//   const me = await getOrCreateUser(clerkId);
+//   if (!me) {
+//     res.status(404).json({ error: "User not found" });
+//     return;
+//   }
+//   if (me.role !== "coach") {
+//     res.status(403).json({ error: "Only coaches can assign peers" });
+//     return;
+//   }
+//   const { studentId, peerId } = req.body;
+//   if (typeof studentId !== "number" || typeof peerId !== "number") {
+//     res.status(400).json({ error: "studentId and peerId are required" });
+//     return;
+//   }
+//   const [student] = await db
+//     .select()
+//     .from(usersTable)
+//     .where(eq(usersTable.id, studentId));
+//   const [peer] = await db
+//     .select()
+//     .from(usersTable)
+//     .where(eq(usersTable.id, peerId));
+//   if (!student || student.role !== "student") {
+//     res.status(404).json({ error: "Student not found" });
+//     return;
+//   }
+//   if (!peer || peer.role !== "peer") {
+//     res.status(404).json({ error: "Peer not found" });
+//     return;
+//   }
+//   await db
+//     .update(usersTable)
+//     .set({ peerId: peer.id })
+//     .where(eq(usersTable.id, student.id));
+//   await db
+//     .update(usersTable)
+//     .set({ studentId: student.id })
+//     .where(eq(usersTable.id, peer.id));
+//   res.json({ success: true });
+// });
 
 export default router;

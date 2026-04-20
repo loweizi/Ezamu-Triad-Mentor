@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Loader2, Clock, UserCheck, Calendar, CheckCircle2, Target } from "lucide-react";
+import { Users, Loader2, Clock, UserCheck, Calendar, CheckCircle2, Target, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -16,6 +16,13 @@ type PeerGoal = {
   id: number;
   title: string;
   status?: string;
+  specific?: string;
+  measurable?: string;
+  achievable?: string;
+  relevant?: string;
+  timeBound?: string;
+  coachFeedback?: string | null;
+  createdAt?: string;
 };
 
 type PeerAppointment = {
@@ -50,6 +57,7 @@ export function PeerDashboardPage() {
   const [goals, setGoals] = useState<PeerGoal[]>([]);
   const [appointments, setAppointments] = useState<PeerAppointment[]>([]);
   const [triad, setTriad] = useState<PeerDashboardResponse["triad"] | null>(null);
+  const [expandedGoalIds, setExpandedGoalIds] = useState<number[]>([]);
 
   useEffect(() => {
     fetch("/api/users/peer-dashboard")
@@ -86,6 +94,14 @@ export function PeerDashboardPage() {
       (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
     );
   }, [appointments]);
+
+  const toggleGoal = (goalId: number) => {
+    setExpandedGoalIds((prev) =>
+      prev.includes(goalId)
+        ? prev.filter((id) => id !== goalId)
+        : [...prev, goalId]
+    );
+  };
 
   if (loading) {
     return (
@@ -217,28 +233,81 @@ export function PeerDashboardPage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl bg-white border p-5">
-                  <h3 className="text-[#121c34] font-semibold flex items-center gap-2 mb-4">
-                    <Target className="w-5 h-5 text-[#3131d8]" />
-                    SMART Goals
-                  </h3>
-                  <div className="space-y-3">
-                    {goals.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No SMART goals yet.</p>
-                    ) : (
-                      goals.map((g) => (
-                        <div
-                          key={g.id}
-                          className="rounded-lg border bg-slate-50 p-3 flex items-center justify-between gap-3"
-                        >
-                          <p className="font-medium text-[#121c34]">{g.title}</p>
-                          {g.status && <Badge variant="outline">{g.status}</Badge>}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                {goals.length > 0 && (
+                  <div className="rounded-xl bg-white border p-5">
+                    <h3 className="text-[#121c34] font-semibold flex items-center gap-2 mb-4">
+                      <Target className="w-5 h-5 text-[#3131d8]" />
+                      SMART Goals
+                    </h3>
 
+                    <div className="space-y-3">
+                      {goals.map((goal) => {
+                        const expanded = expandedGoalIds.includes(goal.id);
+
+                        return (
+                          <div key={goal.id} className="rounded-xl border bg-slate-50 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleGoal(goal.id)}
+                              className="w-full p-4 flex items-start justify-between gap-3 text-left hover:bg-slate-100/70 transition-colors"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-medium text-[#121c34]">{goal.title}</p>
+                                {goal.timeBound && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Due {format(new Date(goal.timeBound), "MMM d, yyyy")}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <Badge className="capitalize">{goal.status}</Badge>
+                                {expanded ? (
+                                  <ChevronUp className="w-4 h-4 text-slate-500" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-slate-500" />
+                                )}
+                              </div>
+                            </button>
+
+                            {expanded && (
+                              <div className="border-t px-4 py-4 text-sm text-muted-foreground grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <p className="font-semibold text-[#3131d8] mb-1">S: Specific</p>
+                                  <p>{goal.specific || "—"}</p>
+                                </div>
+
+                                <div>
+                                  <p className="font-semibold text-[#607b7d] mb-1">M: Measurable</p>
+                                  <p>{goal.measurable || "—"}</p>
+                                </div>
+
+                                <div>
+                                  <p className="font-semibold text-[#bb7e5d] mb-1">A: Achievable</p>
+                                  <p>{goal.achievable || "—"}</p>
+                                </div>
+
+                                <div>
+                                  <p className="font-semibold text-[#dbb68f] mb-1">R: Relevant</p>
+                                  <p>{goal.relevant || "—"}</p>
+                                </div>
+
+                                <div className="md:col-span-2">
+                                  <p className="font-semibold text-[#121c34] mb-1">T: Time-bound</p>
+                                  <p>
+                                    {goal.timeBound
+                                      ? format(new Date(goal.timeBound), "MMM d, yyyy")
+                                      : "—"}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="rounded-xl bg-white border p-5">
                   <h3 className="text-[#121c34] font-semibold flex items-center gap-2 mb-4">
                     <Users className="w-5 h-5 text-[#3131d8]" />

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, isNotNull, and } from "drizzle-orm";
+import { eq, ilike, or, and, isNull } from "drizzle-orm";
 import {
   actionItemsTable,
   appointmentsTable,
@@ -261,7 +261,7 @@ router.delete("/users/me", requireAuth, async (req, res): Promise<void> => {
 
       await tx
         .update(usersTable)
-        .set({ coachId: null })
+        .set({ coachId: null, studentId: null })
         .where(
           and(
             eq(usersTable.coachId, user.id),
@@ -295,7 +295,7 @@ router.delete("/users/me", requireAuth, async (req, res): Promise<void> => {
       if (user.peerId) {
         await tx
           .update(usersTable)
-          .set({ coachId: null })
+          .set({ coachId: null, studentId: null })
           .where(eq(usersTable.id, user.peerId));
       }
     }
@@ -308,6 +308,13 @@ router.delete("/users/me", requireAuth, async (req, res): Promise<void> => {
         .where(eq(usersTable.peerId, user.id));
 
       // Existing coach-student appointments should remain, just remove peer from them
+      if (user.studentId) {
+        await tx
+          .update(usersTable)
+          .set({ peerId: null })
+          .where(eq(usersTable.id, user.studentId));
+      }
+
       await tx
         .update(appointmentsTable)
         .set({ peerId: null })
@@ -389,13 +396,23 @@ router.post("/users/assign-peer", requireAuth, async (req, res): Promise<void> =
   }
 
   await db.transaction(async (tx) => {
-    // Remove this peer from any other student first
-    await tx
-      .update(usersTable)
-      .set({ peerId: null })
-      .where(eq(usersTable.peerId, peer.id));
+    // If this student already has a peer, release that old peer first
+    if (student.peerId) {
+      await tx
+        .update(usersTable)
+        .set({ coachId: null, studentId: null })
+        .where(eq(usersTable.id, student.peerId));
+    }
 
-    // Claim student under this coach and assign peer
+    // If this peer is already assigned to another student, clear that student's peerId
+    if (peer.studentId) {
+      await tx
+        .update(usersTable)
+        .set({ peerId: null })
+        .where(eq(usersTable.id, peer.studentId));
+    }
+
+    // Assign peer to this student
     await tx
       .update(usersTable)
       .set({
@@ -404,10 +421,13 @@ router.post("/users/assign-peer", requireAuth, async (req, res): Promise<void> =
       })
       .where(eq(usersTable.id, student.id));
 
-    // Mark peer as belonging under this coach
+    // Mark peer as assigned to this student and coach
     await tx
       .update(usersTable)
-      .set({ coachId: coach.id })
+      .set({
+        coachId: coach.id,
+        studentId: student.id,
+      })
       .where(eq(usersTable.id, peer.id));
   });
 
@@ -460,7 +480,7 @@ router.post("/users/remove-peer", requireAuth, async (req, res): Promise<void> =
 
     await tx
       .update(usersTable)
-      .set({ coachId: null })
+      .set({ coachId: null, studentId: null })
       .where(eq(usersTable.id, peerId));
 
     await tx
@@ -486,29 +506,40 @@ router.get("/users/available-peers", requireAuth, async (req, res): Promise<void
     return;
   }
 
-  // Get all peers who are:
-  // - role = peer
-  // - finished onboarding
-  // - NOT currently assigned to any student
-  const peers = await db
-    .select()
+  const rawPeers = await db
+    .select({
+      id: usersTable.id,
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      email: usersTable.email,
+      profilePicUrl: usersTable.profilePicUrl,
+      bio: usersTable.bio,
+      age: usersTable.age,
+      fieldsOfInterest: usersTable.fieldsOfInterest,
+      fieldsOfExpertise: usersTable.fieldsOfExpertise,
+      studentId: usersTable.studentId,
+    })
     .from(usersTable)
-    .where(eq(usersTable.role, "peer"));
+    .where(
+      and(
+        eq(usersTable.role, "peer"),
+        eq(usersTable.onboardingCompleted, true),
+      )
+    );
 
-  // Filter out assigned peers
-  const assignedPeerIds = await db
+  const assignedPeerLinks = await db
     .select({ peerId: usersTable.peerId })
     .from(usersTable)
-    .where(isNotNull(usersTable.peerId));
+    .where(eq(usersTable.role, "student"));
 
-  const assignedSet = new Set(
-    assignedPeerIds.map((p) => p.peerId).filter(Boolean)
+  const assignedPeerIdSet = new Set(
+    assignedPeerLinks
+      .map((row) => row.peerId)
+      .filter((id): id is number => id !== null)
   );
 
-  const availablePeers = peers.filter(
-    (p) =>
-      p.onboardingCompleted &&
-      !assignedSet.has(p.id)
+  const availablePeers = rawPeers.filter(
+    (peer) => peer.studentId == null && !assignedPeerIdSet.has(peer.id)
   );
 
   res.json(
@@ -536,10 +567,15 @@ router.get("/users/peer-dashboard", requireAuth, async (req, res): Promise<void>
     return;
   }
 
+  if (!peer.studentId) {
+    res.json({ assigned: false });
+    return;
+  }
+
   const [student] = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.peerId, peer.id));
+    .where(eq(usersTable.id, peer.studentId));
 
   if (!student) {
     res.json({ assigned: false });
@@ -565,6 +601,13 @@ router.get("/users/peer-dashboard", requireAuth, async (req, res): Promise<void>
       id: smartGoalsTable.id,
       title: smartGoalsTable.title,
       status: smartGoalsTable.status,
+      specific: smartGoalsTable.specific,
+      measurable: smartGoalsTable.measurable,
+      achievable: smartGoalsTable.achievable,
+      relevant: smartGoalsTable.relevant,
+      timeBound: smartGoalsTable.timeBound,
+      coachFeedback: smartGoalsTable.coachFeedback,
+      createdAt: smartGoalsTable.createdAt,
     })
     .from(smartGoalsTable)
     .where(eq(smartGoalsTable.studentId, student.id));
@@ -582,7 +625,16 @@ router.get("/users/peer-dashboard", requireAuth, async (req, res): Promise<void>
       bio: student.bio ?? "",
     },
     tasks,
-    goals,
+    goals: goals.map((g) => ({
+      id: g.id,
+      title: g.title,
+      status: g.status,
+      specific: g.specific ?? "",
+      measurable: g.measurable ?? "",
+      achievable: g.achievable ?? "",
+      relevant: g.relevant ?? "",
+      timeBound: g.timeBound ? g.timeBound.toString() : null,
+    })),
     appointments: appointments.map((a) => ({
       id: a.id,
       title: a.title,
