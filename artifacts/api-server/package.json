@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev": "pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -15,11 +15,13 @@
     "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2",
+    "dotenv": "^16.6.1",
     "drizzle-orm": "catalog:",
     "express": "^5",
     "http-proxy-middleware": "^3.0.5",
     "pino": "^9",
-    "pino-http": "^10"
+    "pino-http": "^10",
+    "resend": "^4.0.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
