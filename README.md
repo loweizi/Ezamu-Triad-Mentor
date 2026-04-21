@@ -1,8 +1,24 @@
 # Ezamu - Triad Mentorship Platform
 
+## Project Summary
+
+Ezamu is a full-stack triad mentorship web platform designed to support high school students as they explore careers, college pathways, and personal development. The platform connects each student with a coach and an accountability peer, helping them discover their “Inner Hero” archetype, track S.M.A.R.T. goals, and stay engaged through mentorship, appointments, and action items.
+
+Its intended use is to provide a structured mentorship experience where students receive guidance, accountability, and personalized support. Coaches can monitor student progress, assign next steps, and review assessments, while guardians can stay informed through a read-only view of the student experience.
+
 ## Overview
 
 Ezamu is a full-stack triad mentorship web platform connecting students with coaches and accountability peers to help them discover their "Inner Hero" archetype and achieve S.M.A.R.T. goals.
+
+## Intended Use
+
+The platform is intended for three primary groups:
+
+- **Students** — complete the Inner Hero assessment, book coaching sessions, view action items, message others, and create S.M.A.R.T. goals
+- **Coaches** — manage student progress, assign action items, review goals, and manage appointment availability
+- **Guardians** — view student progress through a read-only dashboard experience
+
+The platform is especially useful for mentorship programs focused on college readiness, career exploration, motivation, and accountability.
 
 ## Stack
 
@@ -10,114 +26,49 @@ Ezamu is a full-stack triad mentorship web platform connecting students with coa
 - **Node.js version**: 24
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
-- **Frontend**: React + Vite (artifacts/ezamu) — hosted on Vercel
-- **API framework**: Express 5 (artifacts/api-server) — hosted on Railway
+- **Frontend**: React + Vite (`artifacts/ezamu`) — hosted on Vercel
+- **API framework**: Express 5 (`artifacts/api-server`) — hosted on Railway
 - **Database**: PostgreSQL + Drizzle ORM — hosted on Supabase
 - **Auth**: Clerk (white-label)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
-## Key Commands
+## Versioning / Replication Notes
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+To best replicate the development setup, use the same core versions listed below:
 
-## Database Tables
+- **Node.js**: 24
+- **pnpm**: workspace-managed package manager
+- **TypeScript**: 5.9
+- **Express**: version 5
+- **React + Vite**: as defined in `artifacts/ezamu/package.json`
+- **Drizzle ORM**: as defined in workspace package files
+- **Zod / drizzle-zod / Orval / esbuild**: as defined in the relevant `package.json` files
 
-- **users** — all users (students, coaches, guardians); contains all fields from OpenAPI spec
-- **appointments** — appointments between students and coaches
-- **action_items** — tasks assigned to students by coaches
-- **coach_availability** — available slots for coaches
-- **assessment_results** — Inner Hero quiz results per student
-- **notifications** — in-app notifications per user
-- **messages** — chat messages between users
-- **smart_goals** — SMART goals created by students, approved/denied by coaches
-- **coach_notes** — private coach notes per student (only visible to the coach)
+For the exact dependency versions used in the project, refer to:
 
-## Pages
+- `package.json`
+- `artifacts/ezamu/package.json`
+- `artifacts/api-server/package.json`
+- `pnpm-lock.yaml`
 
-- `/` — Landing page (public): hero, how it works, testimonials, CTA
-- `/sign-in` — Clerk sign-in
-- `/sign-up` — Clerk sign-up
-- `/onboarding` — Post-signup onboarding flow
-- `/dashboard` — Role-aware dashboard (coach sees CoachDashboardPage, student sees StudentDashboardPage)
-- `/assessment` — 9-question Inner Hero assessment
-- `/appointments` — Browse coaches and book sessions
-- `/coach/:coachId` — Individual coach profile
-- `/coach/student/:studentId` — Coach view of a student (info, progress, SMART goals, private notes)
-- `/profile` — Edit profile
-- `/chat` — Messaging
-- `/contact` — Contact page (public)
+The `pnpm-lock.yaml` file should be used to reproduce the exact installed dependency tree.
 
-## File Navigation
+## Installation and Setup
 
-artifacts/ — contains the app projects
-	api-server/ — backend service
-		src/ — backend source code
-			lib/ — shared backend utilities
-middlewares/ — request/auth middleware
-routes/ — API route handlers
-app.ts — app setup
-index.ts — server entry point
-.env.example — sample environment variables
-build.mjs — build script
-package.json
-tsconfig.json
-ezamu/ — frontend app
-	.replit-artifact
-public/ — static assets
-src/ — main frontend code
-	components/ — reusable UI pieces
-hooks/ — custom React hooks
-lib/ — shared frontend utilities
-pages/ — page-level views
-App.tsx — main app component
-index.css — global styles
-main.tsx — frontend entry point
-.env.example
-components.json
-index.html
-package.json
-tsconfig.json
-vercel.json
-vite.config.ts
-lib/ — shared library code
-scripts/ — utility or setup scripts
-.gitignore
-.node-version
-.npmrc
-README.md
-package.json
-pnpm-lock.yaml
-pnpm-workspace.yaml
-railway.json
-tsconfig.base.json
-tsconfig.json
+### Prerequisites
 
+Before running the project, make sure the following are installed:
 
-## Design
+- **Node.js 24**
+- **pnpm**
+- Access to a **PostgreSQL** database
+- A **Clerk** project for authentication
+- Environment variable configuration for frontend and backend services
 
-- **Background gradient**: `linear-gradient(180deg, #121c34 0%, #3131d8 40%, #add8e6 100%)`
-- **Color palette**: #121c34 (dark navy), #607b7d (steel teal), #dbb68f (warm sand), #bb7e5d (terra cotta), #acedff (sky blue)
-- **Inner Hero archetypes**: Thinker, Helper, Planner, Doer
+### Clone the Repository
 
-## User Roles
-
-- **Student**: takes assessment, books coaches, receives action items
-- **Coach**: manages availability, assigns action items, views student progress
-- **Guardian**: read-only view of their student's dashboard
-
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
-
-## Recent Updates
-- changing the sign-up wording from “Students” to “Student/Peers”
-- adding sign-up pop-ups with customized getting started guidance for students/peers and for coaches to improve navigation
-- adding a small description for each “inner hero” option in the assessment so students have more context when ranking them
-- adding a “Triad Team” section on the student dashboard for easy access
-- updating the assessment page so that if a student has already completed the assessment, their results are shown first, along with a button at the bottom allowing them to retake it if they choose
-- peers are strictly accountability partners and will no longer be counted as students that will receive coaching
-- parents get an invite link to sign up
+```bash
+git clone <your-repository-url>
+cd <your-repository-folder>
